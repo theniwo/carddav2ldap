@@ -45,7 +45,6 @@ At first the ldap directory is empty and only contains your base
 docker exec -it carddav2ldap_ldap_1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
 ```
 ```
-root@host:# docker exec -it carddav2ldap_ldap_1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "ou=contacts,dc=niwo,dc=home" -LLL "(objectClass=*)"
 SASL/EXTERNAL authentication started
 SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
 SASL SSF: 0
@@ -54,6 +53,7 @@ Matched DN: dc=niwo,dc=home
 ```
 
 Next we need to create two OUs
+
 `root@host:# cat base.ldif`
 ```
 # Create OU config
@@ -67,6 +67,7 @@ objectClass: organizationalUnit
 ou: contacts
 
 ```
+
 edit base.ldif to your needs and copy it to your "carddav2ldap_ldap_config" docker volume (usually `/var/lib/docker/volumes/carddav2ldap_ldap_config/_data`)
 
 and run
