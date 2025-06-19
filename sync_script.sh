@@ -17,6 +17,13 @@ if [[ "${DEBUG,,}" == "true" ]]; then
     echo "$(date): DEBUGGING MODE ACTIVE" # Added debugging mode active message
 fi
 
+# Determine if sensitive information should be censored in logs (default to true for security)
+# CENSOR_SECRETS_IN_LOGS can be "true" or "false" (case-insensitive)
+CENSOR_SECRETS_IN_LOGS_ENABLED=true
+if [[ -n "${CENSOR_SECRETS_IN_LOGS}" && "${CENSOR_SECRETS_IN_LOGS,,}" == "false" ]]; then
+    CENSOR_SECRETS_IN_LOGS_ENABLED=false
+fi
+
 # --- Logging Einstellungen ---
 # Dies ist der Standard-Pfad, wenn LOG_FILE nicht gesetzt ist oder ungültig ist.
 DEFAULT_FILE_LOG_PATH="/var/log/carddav2ldap/sync_output.log"
@@ -30,7 +37,7 @@ ACTIVE_FILE_LOG_PATH=""
 # 3. Sonst (benutzerdefinierter Pfad), den Wert von LOG_FILE nutzen.
 if [[ "${LOG_FILE,,}" == "false" || -z "${LOG_FILE}" ]]; then
     # File logging disabled (LOG_FILE not set or set to 'False'/'false').
-    echo "$(date): File logging disabled (LOG_FILE not set or set to 'false')." | tee /dev/stdout
+    echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')." | tee /dev/stdout
     ACTIVE_FILE_LOG_PATH="/dev/null"
 elif [[ "${LOG_FILE,,}" == "true" ]]; then
     # LOG_FILE is explicitly set to true, use the default path.
@@ -63,7 +70,12 @@ echo "$(date): Starting carddav2ldap synchronization script..." | log_and_tee
 # Nur ausführen, wenn DEBUG explizit auf 'true' gesetzt ist UND Dateil-Logging aktiv ist.
 if [[ "${DEBUG,,}" == "true" && "$ACTIVE_FILE_LOG_PATH" != "/dev/null" ]]; then
     echo "$(date): --- Environment variables at script start (after sourcing) ---" >> "$ACTIVE_FILE_LOG_PATH"
-    env >> "$ACTIVE_FILE_LOG_PATH" # Leiten Sie die Ausgabe von 'env' direkt in die Log-Datei
+    # Censor sensitive environment variables if enabled
+    if [[ "$CENSOR_SECRETS_IN_LOGS_ENABLED" == "true" ]]; then
+        env | sed -E 's/^(LDAP_PASSWORD|CARDDAV_PASSWORD)=.*/\1=[REDACTED]/g' >> "$ACTIVE_FILE_LOG_PATH"
+    else
+        env >> "$ACTIVE_FILE_LOG_PATH" # Leiten Sie die Ausgabe von 'env' direkt in die Log-Datei
+    fi
     echo "$(date): ----------------------------------------------------" >> "$ACTIVE_FILE_LOG_PATH"
 fi
 # --- ENDE DEBUGGING-SCHRITT ---
