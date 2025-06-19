@@ -24,8 +24,8 @@ services:
   sync:
     build: .
     depends_on:
-    restart: unless-stopped
       - ldap
+    restart: unless-stopped
     env_file:
       - ./.env
     environment:
