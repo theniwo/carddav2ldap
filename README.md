@@ -30,12 +30,12 @@ CARDDAV_BASE_DISCOVERY_URL
 CARDDAV_USERNAME
 CARDDAV_PASSWORD
 ```
-(if a variable is not set, defaults are used or an error is logged)
+(if a variable is not set, defaults are used or an error is logged!)
 
 Additional (optional) variables are
 ```
-CARDDAV_SSL_VERIFY (enabled by default, can disable ssl verification for debugging purposes.)
-LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a path or to false to disable logging to files.)
+CARDDAV_SSL_VERIFY (enabled by default, can be disabled for debugging purposes.)
+LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a path or to false to disable logging to files. Setting LOG_FILE to false is recommended when the project is running flawlessly, to save hard disk space. There is currently no logrotate implemented.)
 DEBUG (Turns on debug logging.)
 ```
 
@@ -184,7 +184,7 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 
 
 # TODO
-* get rid of LDAP_ADMIN_PASSWORD
+* check logging
 * throw out some default variables from Dockerfile
 * fix: CAT... Error: decoding with 'base64' codec failed (Error: Incorrect padding)
 * fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
