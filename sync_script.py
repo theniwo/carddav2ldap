@@ -12,15 +12,15 @@ import urllib.parse # Import urllib.parse for robust URL concatenation
 import urllib3 # For suppressing InsecureRequestWarning
 
 # --- Environment variable definitions ---
-# Baikal base URL for discovering address books (e.g., "https://your.baikal.server/dav.php/addressbooks/user/")
+# Baikal base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
 # This URL should list all your address books as sub-collections.
-BAIKAL_BASE_DISCOVERY_URL = os.getenv("BAIKAL_BASE_DISCOVERY_URL")
+CARDDAV_BASE_DISCOVERY_URL = os.getenv("CARDDAV_BASE_DISCOVERY_URL")
 # Baikal username
-BAIKAL_USERNAME = os.getenv("BAIKAL_USERNAME")
+CARDDAV_USERNAME = os.getenv("CARDDAV_USERNAME")
 # Baikal password
-BAIKAL_PASSWORD = os.getenv("BAIKAL_PASSWORD")
+CARDDAV_PASSWORD = os.getenv("CARDDAV_PASSWORD")
 # Baikal SSL verification. Set to "true" or "false". (e.g., "true" to verify, "false" to skip)
-BAIKAL_SSL_VERIFY = os.getenv("BAIKAL_SSL_VERIFY")
+CARDDAV_SSL_VERIFY = os.getenv("CARDDAV_SSL_VERIFY")
 
 
 # LDAP server address (e.g., "ldap://localhost:389")
@@ -54,10 +54,10 @@ def get_boolean_env(var_name, default=False):
     return value.lower() == "true"
 
 # --- Fetch environment variables ---
-baikal_base_discovery_url = get_env_or_exit("BAIKAL_BASE_DISCOVERY_URL")
-baikal_username = get_env_or_exit("BAIKAL_USERNAME")
-baikal_password = get_env_or_exit("BAIKAL_PASSWORD")
-ssl_verify = get_boolean_env("BAIKAL_SSL_VERIFY", default=True) # Default to True for security
+carddav_base_discovery_url = get_env_or_exit("CARDDAV_BASE_DISCOVERY_URL")
+carddav_username = get_env_or_exit("CARDDAV_USERNAME")
+carddav_password = get_env_or_exit("CARDDAV_PASSWORD")
+ssl_verify = get_boolean_env("CARDDAV_SSL_VERIFY", default=True) # Default to True for security
 
 ldap_server_url = get_env_or_exit("LDAP_SERVER")
 ldap_user = get_env_or_exit("LDAP_USER")
@@ -71,7 +71,7 @@ if not ssl_verify:
 print("Starting contact synchronization from Baikal to LDAP...")
 
 # --- 1. Discover all address book URLs from Baikal ---
-print(f"Discovering address books from: {baikal_base_discovery_url}")
+print(f"Discovering address books from: {carddav_base_discovery_url}")
 discovery_headers = {
     "Depth": "1",  # Request depth 1 to get direct child collections
     "Content-Type": "application/xml; charset=UTF-8",
@@ -89,10 +89,10 @@ address_book_urls = []
 try:
     discovery_response = requests.request(
         method="PROPFIND",
-        url=baikal_base_discovery_url,
+        url=carddav_base_discovery_url,
         headers=discovery_headers,
         data=discovery_body.encode("utf-8"),
-        auth=HTTPBasicAuth(baikal_username, baikal_password),
+        auth=HTTPBasicAuth(carddav_username, carddav_password),
         verify=ssl_verify # Use the SSL verification setting from environment variable
     )
     discovery_response.raise_for_status()
@@ -103,7 +103,7 @@ except requests.exceptions.RequestException as e:
 
 if discovery_response.status_code != 207:
     print(f"ERROR: CardDAV PROPFIND for discovery failed. Expected 207 Multi-Status, got {discovery_response.status_code}.")
-    print("Please check your BAIKAL_BASE_DISCOVERY_URL, BAIKAL_USERNAME, and BAIKAL_PASSWORD.")
+    print("Please check your CARDDAV_BASE_DISCOVERY_URL, CARDDAV_USERNAME, and CARDDAV_PASSWORD.")
     sys.exit(1)
 
 discovery_ns = {
@@ -125,19 +125,19 @@ for response_elem in discovery_root.findall(".//d:response", discovery_ns):
             # Use urljoin for robust path concatenation
             # It intelligently handles absolute paths (starting with '/') by replacing the base path
             # and relative paths by appending to the base path.
-            # We need to ensure baikal_base_discovery_url acts as the true base URL (scheme://netloc)
-            parsed_base = urllib.parse.urlparse(baikal_base_discovery_url)
+            # We need to ensure carddav_base_discovery_url acts as the true base URL (scheme://netloc)
+            parsed_base = urllib.parse.urlparse(carddav_base_discovery_url)
             base_for_join = f"{parsed_base.scheme}://{parsed_base.netloc}"
             full_url = urllib.parse.urljoin(base_for_join, relative_url_path)
 
             address_book_urls.append(full_url)
 
 if not address_book_urls:
-    print("WARNING: No address books found at the specified BAIKAL_BASE_DISCOVERY_URL.")
-    # Attempt to use BAIKAL_BASE_DISCOVERY_URL itself as a single address book if no others found.
+    print("WARNING: No address books found at the specified CARDDAV_BASE_DISCOVERY_URL.")
+    # Attempt to use CARDDAV_BASE_DISCOVERY_URL itself as a single address book if no others found.
     # This covers cases where the discovery URL IS the address book.
-    print(f"Attempting to use {baikal_base_discovery_url} as a single address book.")
-    address_book_urls.append(baikal_base_discovery_url)
+    print(f"Attempting to use {carddav_base_discovery_url} as a single address book.")
+    address_book_urls.append(carddav_base_discovery_url)
 
 
 print(f"Found {len(address_book_urls)} address book(s) to process.")
@@ -165,7 +165,7 @@ for book_url in address_book_urls:
             url=book_url,
             headers=contact_headers,
             data=contact_body.encode("utf-8"),
-            auth=HTTPBasicAuth(baikal_username, baikal_password),
+            auth=HTTPBasicAuth(carddav_username, carddav_password),
             verify=ssl_verify # Use the SSL verification setting from environment variable
         )
         response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
