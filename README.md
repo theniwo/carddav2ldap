@@ -184,9 +184,11 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 
 
 # TODO
+* get rid of LDAP_ADMIN_PASSWORD
+* throw out some default variables from Dockerfile
+* fix: CAT... Error: decoding with 'base64' codec failed (Error: Incorrect padding)
+* fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
 * make cron string as a variable
 * make setting up ldap structure automatic with variables
 * Add snom xml setup
-* get rid of LDAP_ADMIN_PASSWORD
-* throw out some default variables from Dockerfile
 * shrink docker image
