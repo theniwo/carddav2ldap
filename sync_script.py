@@ -40,10 +40,13 @@ LDAP_PASSWORD = os.getenv("LDAP_PASSWORD")
 def get_env_or_exit(var_name):
     """
     Retrieves an environment variable. Exits if the variable is not set.
+    Includes debug print to show value before exiting.
     """
     value = os.getenv(var_name)
     if not value:
-        print(f"ERROR: Environment variable '{var_name}' is not set. Please set it and retry.")
+        # Print to stderr so it's always visible in logs, even if stdout is buffered
+        print(f"ERROR: Environment variable '{var_name}' is not set. Current value received: '{value}'. Please set it and retry.", file=sys.stderr)
+        sys.stderr.flush() # Ensure it's flushed immediately
         sys.exit(1)
     return value
 
@@ -286,9 +289,13 @@ try:
         print(f"ERROR: LDAP bind failed: {conn.result}")
         # Added debug print for LDAP bind values for invalidDNSyntax diagnosis
         print(f"DEBUG: LDAP User (bind_dn): '{ldap_user}'")
+        sys.stdout.flush() # Flush print statement immediately
         print(f"DEBUG: LDAP Password length: {len(ldap_password) if ldap_password else 0} (not printed for security)")
+        sys.stdout.flush() # Flush print statement immediately
         print(f"DEBUG: LDAP Server URL: '{ldap_server_url}'")
+        sys.stdout.flush() # Flush print statement immediately
         print(f"DEBUG: LDAP Base DN: '{ldap_base_dn}'") # Crucial for DN syntax
+        sys.stdout.flush() # Flush print statement immediately
         sys.exit(1)
     print("Successfully connected and bound to LDAP server.")
 
@@ -325,6 +332,7 @@ for contact in all_parsed_contacts:
 
     # Debug print for constructed LDAP entry
     print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {attributes}")
+    sys.stdout.flush() # Flush print statement immediately
 
     try:
         # Attempt to add the entry

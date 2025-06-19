@@ -189,10 +189,11 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 * throw out some default variables from Dockerfile and test missing/unset variables [X]
 * fix: CAT... Error: decoding with 'base64' codec failed (Error: Incorrect padding) [X]
 * Import Photos [X]
+* LOG_FILE=true
 * fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
 * make cron string as a variable
-* make setting up ldap structure automatic with variables
 * Add snom xml setup
 * shrink docker image
+* make setting up ldap structure automatic with variables
 * translate german comments to english
 * reformat readme and describe variables more clearly

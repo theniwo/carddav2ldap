@@ -2,6 +2,7 @@
 # docker-entrypoint.sh
 
 # Aktiviert Debugging (set -eux) nur, wenn DEBUG auf "true" gesetzt ist (case-insensitive)
+# Diese Zeile sollte die erste Ausführungszeile nach dem Shebang sein.
 if [[ "${DEBUG,,}" == "true" ]]; then
     set -eux # Exit immediately if a command exits with a non-zero status. Print commands and their arguments as they are executed.
 fi
