@@ -25,12 +25,12 @@ CARDDAV_SSL_VERIFY = os.getenv("CARDDAV_SSL_VERIFY")
 
 # LDAP server address (e.g., "ldap://localhost:389")
 LDAP_SERVER = os.getenv("LDAP_SERVER")
+# LDAP base DN for contacts (e.g., "ou=contacts,dc=yourdomain,dc=local")
+LDAP_BASE_DN = os.getenv("LDAP_BASE_DN")
 # LDAP bind username (e.g., "cn=admin,dc=yourdomain,dc=local")
 LDAP_USER = os.getenv("LDAP_USER")
 # LDAP bind password
 LDAP_PASSWORD = os.getenv("LDAP_PASSWORD")
-# LDAP base DN for contacts (e.g., "ou=contacts,dc=yourdomain,dc=local")
-LDAP_BASE_DN = os.getenv("LDAP_BASE_DN")
 
 # --- Helper function to get environment variables or exit ---
 def get_env_or_exit(var_name):
