@@ -1,6 +1,5 @@
 *.env
-.env
 *.ldif
-.ldif
 *.bak
-.bak
+*.swp
+*.xml
