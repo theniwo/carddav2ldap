@@ -16,7 +16,7 @@ There are 3 containers:
 
 ## Prerequisits
 Enter credentials and URLs in `.env`
-Valid variables are
+Valid required variables are
 
 ```
 LDAP_ORGANISATION
@@ -24,12 +24,19 @@ LDAP_DOMAIN
 LDAP_BASE_DN
 LDAP_USER
 LDAP_ADMIN_PASSWORD
-LDAP_PASSWORD
+LDAP_PASSWORD (same as LDAP_ADMIN_PASSWORD)
 LDAP_SERVER
 CARDDAV_BASE_DISCOVERY_URL
 CARDDAV_USERNAME
 CARDDAV_PASSWORD
-CARDDAV_SSL_VERIFY
+```
+(if a variable is not set, defaults are used or an error is logged)
+
+Additional (optional) variables are
+```
+CARDDAV_SSL_VERIFY (enabled by default, can disable ssl verification for debugging purposes.)
+LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a path or to false to disable logging to files.)
+DEBUG (Turns on debug logging.)
 ```
 
 ## Build and start Containers
@@ -42,7 +49,7 @@ docker compose up -d
 At first the ldap directory is empty and only contains your base
 
 ```
-docker exec -it carddav2ldap_ldap_1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
+docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
 ```
 ```
 SASL/EXTERNAL authentication started
@@ -73,13 +80,15 @@ edit base.ldif to your needs and copy it to your "carddav2ldap_ldap_config" dock
 and run
 
 ```
-docker exec -it carddav2ldap_ldap_1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/base.ldif
+docker exec -it carddav2ldap-ldap-1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/base.ldif
 ```
 
 now you should have
 
 ```
-root@host:# docker exec -it carddav2ldap_ldap_1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
+root@host:# docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
+```
+```
 SASL/EXTERNAL authentication started
 SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
 SASL SSF: 0
@@ -175,7 +184,9 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 
 
 # TODO
-* shrink docker image
 * make cron string as a variable
 * make setting up ldap structure automatic with variables
 * Add snom xml setup
+* get rid of LDAP_ADMIN_PASSWORD
+* throw out some default variables from Dockerfile
+* shrink docker image
