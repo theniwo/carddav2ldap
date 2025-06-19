@@ -175,7 +175,7 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 
 
 # TODO
-[ ] - shrink docker image
-[ ] - make cron string as a variable
-[ ] - make setting up ldap structure automatic with variables
-[ ] - Add snom xml setup
+* shrink docker image
+* make cron string as a variable
+* make setting up ldap structure automatic with variables
+* Add snom xml setup
