@@ -21,7 +21,7 @@ fi
 # CENSOR_SECRETS_IN_LOGS can be "true" or "false" (case-insensitive)
 CENSOR_SECRETS_IN_LOGS_ENABLED=true
 if [[ -n "${CENSOR_SECRETS_IN_LOGS}" && "${CENSOR_SECRETS_IN_LOGS,,}" == "false" ]]; then
-	CENSOR_SECRETS_IN_LOGS_ENABLED=false
+    CENSOR_SECRETS_IN_LOGS_ENABLED=false
 fi
 
 # --- Logging Einstellungen ---
