@@ -101,7 +101,7 @@ ou: contacts
 ```
 
 ## Add user
-Next we add a user to read your ldap directory
+Next we add users to read your ldap directory
 
 `root@host:# cat users.ldif`
 ```
@@ -119,12 +119,15 @@ cn: printer
 sn: printer
 userPassword:
 ```
-you can do the same with a printer_user or anything else you need
 
 
 ```
-root@host:# cp users.ldif /var/lib/docker/volumes/carddav2ldap_ldap_config/_data
-root@host:# docker exec -it carddav2ldap_ldap_1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/users.ldif
+cp users.ldif /var/lib/docker/volumes/carddav2ldap_ldap_config/_data
+```
+```
+docker exec -it carddav2ldap_ldap_1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/users.ldif
+```
+```
 SASL/EXTERNAL authentication started
 SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
 SASL SSF: 0
