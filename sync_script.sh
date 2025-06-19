@@ -24,20 +24,26 @@ DEFAULT_FILE_LOG_PATH="/var/log/carddav2ldap/sync_output.log"
 ACTIVE_FILE_LOG_PATH=""
 
 # Bestimmen, ob das Logging in eine Datei aktiv sein soll und setzen Sie den Pfad.
-# Überprüft, ob LOG_FILE Umgebungsvariable gesetzt ist und nicht "False" (case-insensitive) oder leer ist.
-if [[ -n "${LOG_FILE}" && "${LOG_FILE,,}" != "false" && -n "${LOG_FILE}" ]]; then
-    # Convert LOG_FILE to lowercase for comparison, but use original value for path
-    ACTIVE_FILE_LOG_PATH="${LOG_FILE}"
-    # Stellen Sie sicher, dass das Verzeichnis existiert, bevor Sie in die Log-Datei schreiben.
-    mkdir -p "$(dirname "$ACTIVE_FILE_LOG_PATH")"
-    # Diese Nachricht geht an stdout (Docker-Logs) und an die Datei
-    echo "$(date): File logging enabled. Output also written to: ${ACTIVE_FILE_LOG_PATH}" | tee -a "$ACTIVE_FILE_LOG_PATH"
-else
-    # Diese Nachricht geht nur an stdout (Docker-Logs)
-    echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')."
-    # Wenn das Dateil-Logging deaktiviert ist, leiten Sie tee's Dateiausgabe nach /dev/null um.
+# Logik:
+# 1. Wenn LOG_FILE leer oder "false", logging deaktivieren (/dev/null).
+# 2. Wenn LOG_FILE "true", Standardpfad nutzen.
+# 3. Sonst (benutzerdefinierter Pfad), den Wert von LOG_FILE nutzen.
+if [[ "${LOG_FILE,,}" == "false" || -z "${LOG_FILE}" ]]; then
+    # File logging disabled (LOG_FILE not set or set to 'False'/'false').
+    echo "$(date): File logging disabled (LOG_FILE not set or set to 'false')." | tee /dev/stdout
     ACTIVE_FILE_LOG_PATH="/dev/null"
+elif [[ "${LOG_FILE,,}" == "true" ]]; then
+    # LOG_FILE is explicitly set to true, use the default path.
+    ACTIVE_FILE_LOG_PATH="${DEFAULT_FILE_LOG_PATH}"
+    mkdir -p "$(dirname "$ACTIVE_FILE_LOG_PATH")"
+    echo "$(date): File logging enabled (using default path: ${ACTIVE_FILE_LOG_PATH})." | tee -a "$ACTIVE_FILE_LOG_PATH"
+else
+    # LOG_FILE is set to a custom path.
+    ACTIVE_FILE_LOG_PATH="${LOG_FILE}"
+    mkdir -p "$(dirname "$ACTIVE_FILE_LOG_PATH")"
+    echo "$(date): File logging enabled. Output also written to: ${ACTIVE_FILE_LOG_PATH}" | tee -a "$ACTIVE_FILE_LOG_PATH"
 fi
+
 
 # Diese Funktion leitet ihre Eingabe über `tee` weiter.
 # Sie stellt sicher, dass die Ausgabe immer an stdout (für Docker-Logs) geht
@@ -54,8 +60,8 @@ echo "$(date): Starting carddav2ldap synchronization script..." | log_and_tee
 
 # --- DEBUGGING-SCHRITT (NUR ins File-Log, NICHT Docker-Logs) ---
 # Diese Ausgaben werden nur in die Log-Datei geschrieben, um die Docker-Logs sauber zu halten.
-# Nur ausführen, wenn DEBUG explizit auf 'true' gesetzt ist.
-if [[ "${DEBUG,,}" == "true" ]]; then
+# Nur ausführen, wenn DEBUG explizit auf 'true' gesetzt ist UND Dateil-Logging aktiv ist.
+if [[ "${DEBUG,,}" == "true" && "$ACTIVE_FILE_LOG_PATH" != "/dev/null" ]]; then
     echo "$(date): --- Environment variables at script start (after sourcing) ---" >> "$ACTIVE_FILE_LOG_PATH"
     env >> "$ACTIVE_FILE_LOG_PATH" # Leiten Sie die Ausgabe von 'env' direkt in die Log-Datei
     echo "$(date): ----------------------------------------------------" >> "$ACTIVE_FILE_LOG_PATH"
