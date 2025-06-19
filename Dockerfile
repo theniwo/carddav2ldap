@@ -8,7 +8,8 @@ WORKDIR /app
 ENV \
     LDAP_SERVER="ldap://ldap:389" \
     CARDDAV_SSL_VERIFY="true" \
-    LOG_FILE="/var/log/carddav2ldap/sync_output.log"
+    LOG_FILE="/var/log/carddav2ldap/sync_output.log" \
+    CENSOR_SECRETS_IN_LOGS=true
 
 # Abhängigkeiten für den Build installieren
 RUN apt-get update && apt-get install -y --no-install-recommends \
