@@ -19,13 +19,13 @@ ACTIVE_FILE_LOG_PATH=""
 
 # Bestimmen, ob das Logging in eine Datei aktiv sein soll und setzen Sie den Pfad.
 # Überprüft, ob LOG_FILE Umgebungsvariable gesetzt ist und nicht "False" (case-insensitive) oder leer ist.
-if [[ -n "${LOG_FILE}" && "${LOG_FILE}" != "False" && "${LOG_FILE}" != "false" ]]; then
+if [[ -n "${LOG_FILE}" && "${LOG_FILE,,}" != "false" ]]; then
     ACTIVE_FILE_LOG_PATH="${LOG_FILE}"
     # Stellen Sie sicher, dass das Verzeichnis existiert, bevor Sie in die Log-Datei schreiben.
     #mkdir -p "$(dirname "$ACTIVE_FILE_LOG_PATH")"
     echo "$(date): File logging enabled. Output also written to: ${ACTIVE_FILE_LOG_PATH}"
 else
-    echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')."
+    echo "$(date): File logging disabled (LOG_FILE not set or set to 'false')."
     # Wenn das Dateil-Logging deaktiviert ist, leiten Sie tee's Dateiausgabe nach /dev/null um.
     ACTIVE_FILE_LOG_PATH="/dev/null"
 fi
