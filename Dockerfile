@@ -34,9 +34,6 @@ RUN chmod 0644 /etc/cron.d/ldap-sync-cron \
 # Cronjob aktivieren
 RUN crontab /etc/cron.d/ldap-sync-cron
 
-# Erstellen Sie das Log-Verzeichnis und stellen Sie sicher, dass es beschreibbar ist
-RUN mkdir -p /var/log/carddav2ldap && chmod -R 777 /var/log/carddav2ldap
-
 # Cleanup
 RUN rm requirements.txt -rf
 #RUN rm requirements.txt -rf && apt-get remove -y $(dpkg -l | grep ^ii| awk '{print $2 " "}' | cut -d: -f1 | grep -e gcc -e dev$ | grep -ve libgcc -e base | awk '{printf $1 " "}') && apt-get autoremove -y
