@@ -10,6 +10,7 @@ from requests.auth import HTTPBasicAuth
 import sys
 import urllib.parse
 import urllib3
+import binascii # Import for Base64 decoding errors
 
 # --- Environment variable definitions (renamed for carddav2ldap project) ---
 # CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
@@ -198,26 +199,27 @@ for book_url in address_book_urls:
             surname = ""
             n_obj = getattr(vobj, "n", None)
             if n_obj:
-                given_name = n_obj.first if hasattr(n_obj, 'first') and n_obj.first else ""
-                surname = n_obj.last if hasattr(n_obj, 'last') and n_obj.last else ""
+                # Ensure attributes exist before accessing
+                given_name = getattr(n_obj, 'first', '')
+                surname = getattr(n_obj, 'last', '')
 
             # Fallback for full_name if FN is missing (existing logic, adjusted for n_obj attributes)
             if not full_name:
                 # If FN is empty, try to construct full_name from N (FirstName LastName)
                 if given_name and surname:
-                    full_name = f"{given_name} {surname}"
+                    full_name = f"{given_name} {surname}".strip()
                 elif given_name:
-                    full_name = given_name
+                    full_name = given_name.strip()
                 elif surname:
-                    full_name = surname
+                    full_name = surname.strip()
 
             # Final fallback if still no full name
             if not full_name:
                  full_name = "Unknown Contact"
 
             # Fallback for surname if not extracted from N (e.g., if only FN was present)
-            if not surname and full_name and ' ' in full_name:
-                surname = full_name.split()[-1]
+            if not surname and full_name and ' ' in full_name and full_name != "Unknown Contact":
+                surname = full_name.split()[-1] # This split is on full_name string, not n_obj directly
 
 
             # Extract Email addresses
@@ -233,8 +235,13 @@ for book_url in address_book_urls:
                 "emails": emails,
                 "phones": phones
             })
+        except binascii.Error as e:
+            # Catch specific Base64 decoding errors
+            print(f"ERROR: Base64 decoding failed for vCard from {book_url}. Error: {e}. Problematic vCard blob starts: {vcard_blob[:200]}...")
+            continue # Skip this problematic vCard and continue with others
         except Exception as e:
-            print(f"WARNING: Could not parse vCard blob from {book_url}. Blob start: {vcard_blob[:100]}... Error: {e}")
+            # General error for other parsing issues
+            print(f"WARNING: Could not parse vCard blob from {book_url}. Error: {e}. Blob start: {vcard_blob[:200]}...")
             continue
 
 print(f"Successfully parsed a total of {len(all_parsed_contacts)} contacts from all address books.")
@@ -249,9 +256,11 @@ try:
 
     if not conn.bind():
         print(f"ERROR: LDAP bind failed: {conn.result}")
-        # Added debug print for LDAP bind
-        print(f"DEBUG: LDAP User: '{ldap_user}'")
+        # Added debug print for LDAP bind values for invalidDNSyntax diagnosis
+        print(f"DEBUG: LDAP User (bind_dn): '{ldap_user}'")
+        print(f"DEBUG: LDAP Password length: {len(ldap_password) if ldap_password else 0} (not printed for security)")
         print(f"DEBUG: LDAP Server URL: '{ldap_server_url}'")
+        print(f"DEBUG: LDAP Base DN: '{ldap_base_dn}'") # Crucial for DN syntax
         sys.exit(1)
     print("Successfully connected and bound to LDAP server.")
 
