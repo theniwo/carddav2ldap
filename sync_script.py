@@ -4,22 +4,22 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 import vobject
-import ldap3 # Import the whole ldap3 module
+import ldap3
 from ldap3.core.exceptions import LDAPEntryAlreadyExistsResult
 from requests.auth import HTTPBasicAuth
 import sys
-import urllib.parse # Import urllib.parse for robust URL concatenation
-import urllib3 # For suppressing InsecureRequestWarning
+import urllib.parse
+import urllib3
 
-# --- Environment variable definitions ---
-# Baikal base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
+# --- Environment variable definitions (renamed for carddav2ldap project) ---
+# CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
 # This URL should list all your address books as sub-collections.
 CARDDAV_BASE_DISCOVERY_URL = os.getenv("CARDDAV_BASE_DISCOVERY_URL")
-# Baikal username
+# CardDAV username
 CARDDAV_USERNAME = os.getenv("CARDDAV_USERNAME")
-# Baikal password
+# CardDAV password
 CARDDAV_PASSWORD = os.getenv("CARDDAV_PASSWORD")
-# Baikal SSL verification. Set to "true" or "false". (e.g., "true" to verify, "false" to skip)
+# CardDAV SSL verification. Set to "true" or "false". (e.g., "true" to verify, "false" to skip)
 CARDDAV_SSL_VERIFY = os.getenv("CARDDAV_SSL_VERIFY")
 
 
@@ -68,9 +68,9 @@ ldap_base_dn = get_env_or_exit("LDAP_BASE_DN")
 if not ssl_verify:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-print("Starting contact synchronization from Baikal to LDAP...")
+print("Starting contact synchronization from CardDAV to LDAP (Project carddav2ldap)...")
 
-# --- 1. Discover all address book URLs from Baikal ---
+# --- 1. Discover all address book URLs from CardDAV server ---
 print(f"Discovering address books from: {carddav_base_discovery_url}")
 discovery_headers = {
     "Depth": "1",  # Request depth 1 to get direct child collections
@@ -98,7 +98,7 @@ try:
     discovery_response.raise_for_status()
 
 except requests.exceptions.RequestException as e:
-    print(f"ERROR: Failed to connect to Baikal for discovery or fetch data: {e}")
+    print(f"ERROR: Failed to connect to CardDAV server for discovery or fetch data: {e}")
     sys.exit(1)
 
 if discovery_response.status_code != 207:
@@ -122,13 +122,9 @@ for response_elem in discovery_root.findall(".//d:response", discovery_ns):
         if resourcetype_elem.find(".//c:addressbook", discovery_ns) is not None:
             relative_url_path = href_elem.text.strip()
 
-            # Use urljoin for robust path concatenation
-            # It intelligently handles absolute paths (starting with '/') by replacing the base path
-            # and relative paths by appending to the base path.
-            # We need to ensure carddav_base_discovery_url acts as the true base URL (scheme://netloc)
-            parsed_base = urllib.parse.urlparse(carddav_base_discovery_url)
-            base_for_join = f"{parsed_base.scheme}://{parsed_base.netloc}"
-            full_url = urllib.parse.urljoin(base_for_join, relative_url_path)
+            # Use urljoin with the full CARDDAV_BASE_DISCOVERY_URL as the base
+            # This correctly handles trailing slashes and absolute vs relative paths for concatenation.
+            full_url = urllib.parse.urljoin(carddav_base_discovery_url, relative_url_path)
 
             address_book_urls.append(full_url)
 
@@ -195,22 +191,34 @@ for book_url in address_book_urls:
 
             # Extract Full Name (FN)
             fn_obj = getattr(vobj, "fn", None)
-            full_name = fn_obj.value if fn_obj else "" # Initialize with empty string
-            if not full_name: # If FN is missing, try to construct from N (Name) property
-                n_obj = getattr(vobj, "n", None)
-                if n_obj:
-                    # N property format: LastName;FirstName;MiddleName;Prefix;Suffix
-                    parts = [p for p in n_obj.value.split(';') if p]
-                    if len(parts) >= 2:
-                        full_name = f"{parts[1]} {parts[0]}" # FirstName LastName
-                    elif parts:
-                        full_name = parts[0] # Just the last name if only one part
+            full_name = fn_obj.value if fn_obj else ""
 
-            if not full_name: # Fallback if still no name
+            # Extract Given Name (FIRST NAME from N property) and Surname (LAST NAME from N property)
+            given_name = ""
+            surname = ""
+            n_obj = getattr(vobj, "n", None)
+            if n_obj:
+                given_name = n_obj.first if hasattr(n_obj, 'first') and n_obj.first else ""
+                surname = n_obj.last if hasattr(n_obj, 'last') and n_obj.last else ""
+
+            # Fallback for full_name if FN is missing (existing logic, adjusted for n_obj attributes)
+            if not full_name:
+                # If FN is empty, try to construct full_name from N (FirstName LastName)
+                if given_name and surname:
+                    full_name = f"{given_name} {surname}"
+                elif given_name:
+                    full_name = given_name
+                elif surname:
+                    full_name = surname
+
+            # Final fallback if still no full name
+            if not full_name:
                  full_name = "Unknown Contact"
 
-            # Try to derive surname (SN) from full name
-            surname = full_name.split()[-1] if full_name and ' ' in full_name and full_name != "Unknown Contact" else full_name
+            # Fallback for surname if not extracted from N (e.g., if only FN was present)
+            if not surname and full_name and ' ' in full_name:
+                surname = full_name.split()[-1]
+
 
             # Extract Email addresses
             emails = [e.value for e in getattr(vobj, "email_list", [])]
@@ -221,6 +229,7 @@ for book_url in address_book_urls:
             all_parsed_contacts.append({
                 "full_name": full_name,
                 "surname": surname,
+                "given_name": given_name,
                 "emails": emails,
                 "phones": phones
             })
@@ -240,6 +249,9 @@ try:
 
     if not conn.bind():
         print(f"ERROR: LDAP bind failed: {conn.result}")
+        # Added debug print for LDAP bind
+        print(f"DEBUG: LDAP User: '{ldap_user}'")
+        print(f"DEBUG: LDAP Server URL: '{ldap_server_url}'")
         sys.exit(1)
     print("Successfully connected and bound to LDAP server.")
 
@@ -260,7 +272,8 @@ for contact in all_parsed_contacts:
     attributes = {
         'objectClass': ['inetOrgPerson', 'top'], # Required object classes for a person entry
         'cn': contact['full_name'],
-        'sn': contact['surname']
+        'sn': contact['surname'],
+        'givenName': contact['given_name'] # Add givenName, even if empty
     }
 
     # Add optional attributes if they exist
@@ -268,6 +281,9 @@ for contact in all_parsed_contacts:
         attributes['mail'] = contact['emails'][0] # Take the first email
     if contact['phones']:
         attributes['telephoneNumber'] = contact['phones'][0] # Take the first phone number
+
+    # Debug print for constructed LDAP entry
+    print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {attributes}")
 
     try:
         # Attempt to add the entry

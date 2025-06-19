@@ -1,2 +1,9 @@
-* * * * * /usr/local/bin/python /app/sync_script.py >> /var/log/cron.log 2>&1
+# /etc/cron.d/ldap-sync-cron
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+# Der Cronjob-Eintrag:
+# Führt sync_script.sh direkt aus. Das Skript selbst sourcet nun die Umgebung.
+# Alle Ausgaben von sync_script.sh werden von seiner internen log_and_tee-Funktion
+# an /dev/stdout geleitet. Diese Ausgaben werden dann vom Docker-Prozess erfasst.
+* * * * * /bin/bash -c "/app/sync_script.sh" >> /proc/1/fd/1 2>&1
