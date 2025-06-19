@@ -7,7 +7,9 @@ There are 3 containers:
 * web
 
 **ldap** is your ldap directory server.
+
 **sync** runs a script periodically to fetch carddav data and spill it into the ldap directory.
+
 **web** is used for external provisioning templates. You can delete it if you don't need provisioning, but it helps to configure your phone with necessary information to fetch from ldap
 
 # Installation
@@ -38,6 +40,10 @@ docker compose up -d
 
 ## Fill ldap with structure
 At first the ldap directory is empty and only contains your base
+
+```
+docker exec -it carddav2ldap_ldap_1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
+```
 ```
 root@host:# docker exec -it carddav2ldap_ldap_1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "ou=contacts,dc=niwo,dc=home" -LLL "(objectClass=*)"
 SASL/EXTERNAL authentication started
@@ -48,8 +54,8 @@ Matched DN: dc=niwo,dc=home
 ```
 
 Next we need to create two OUs
+`root@host:# cat base.ldif`
 ```
-root@host:# cat base.ldif
 # Create OU config
 dn: ou=config,dc=niwo,dc=home
 objectClass: organizationalUnit
@@ -96,8 +102,8 @@ ou: contacts
 ## Add user
 Next we add a user to read your ldap directory
 
+`root@host:# cat users.ldif`
 ```
-root@host:# cat users.ldif
 # Set up Phone user
 dn: cn=phone,ou=contacts,dc=niwo,dc=home
 objectClass: inetOrgPerson
