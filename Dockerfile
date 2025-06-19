@@ -5,16 +5,8 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Setze Standardwerte für Umgebungsvariablen
-ENV LDAP_ORGANISATION="Default Organisation" \
-    LDAP_DOMAIN="default.com" \
-    LDAP_BASE_DN="dc=default,dc=com" \
-    LDAP_USER="cn=admin,dc=default,dc=com" \
-    LDAP_ADMIN_PASSWORD="changeme_admin" \
-    LDAP_PASSWORD="changeme_user" \
-    LDAP_SERVER="localhost" \
-    CARDDAV_BASE_DISCOVERY_URL="https://carddav.default.com/baikal/html/" \
-    CARDDAV_USERNAME="defaultuser" \
-    CARDDAV_PASSWORD="changeme_carddav" \
+ENV \
+    LDAP_SERVER="ldap://ldap:389" \
     CARDDAV_SSL_VERIFY="true" \
     LOG_FILE="/var/log/carddav2ldap/sync_output.log"
 
