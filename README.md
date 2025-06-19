@@ -15,16 +15,18 @@ There are 3 containers:
 # Installation
 
 ## Prerequisits
-Enter credentials and URLs in `.env`
-Valid required variables are
+Enter credentials and URLs in `.env`.
+
+Variable names should be self explanatory.
+
+Required variables are:
 
 ```
 LDAP_ORGANISATION
 LDAP_DOMAIN
-LDAP_BASE_DN
-LDAP_USER
-LDAP_ADMIN_PASSWORD
-LDAP_PASSWORD (same as LDAP_ADMIN_PASSWORD)
+LDAP_BASE_DN ( LDAP base DN for contacts (e.g., "ou=contacts,dc=yourdomain,dc=local") )
+LDAP_USER ( LDAP bind username (e.g., "cn=admin,dc=yourdomain,dc=local") )
+LDAP_PASSWORD
 LDAP_SERVER
 CARDDAV_BASE_DISCOVERY_URL
 CARDDAV_USERNAME
@@ -184,11 +186,13 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 
 
 # TODO
-* check logging
-* throw out some default variables from Dockerfile
-* fix: CAT... Error: decoding with 'base64' codec failed (Error: Incorrect padding)
+* throw out some default variables from Dockerfile and test missing/unset variables [X]
+* fix: CAT... Error: decoding with 'base64' codec failed (Error: Incorrect padding) [X]
+* Import Photos [X]
 * fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
 * make cron string as a variable
 * make setting up ldap structure automatic with variables
 * Add snom xml setup
 * shrink docker image
+* translate german comments to english
+* reformat readme and describe variables more clearly

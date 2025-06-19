@@ -11,6 +11,7 @@ import sys
 import urllib.parse
 import urllib3
 import binascii # Import for Base64 decoding errors
+import base64   # Import for Base64 encoding/decoding if needed for PHOTO field
 
 # --- Environment variable definitions (renamed for carddav2ldap project) ---
 # CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
@@ -22,6 +23,8 @@ CARDDAV_USERNAME = os.getenv("CARDDAV_USERNAME")
 CARDDAV_PASSWORD = os.getenv("CARDDAV_PASSWORD")
 # CardDAV SSL verification. Set to "true" or "false". (e.g., "true" to verify, "false" to skip)
 CARDDAV_SSL_VERIFY = os.getenv("CARDDAV_SSL_VERIFY")
+# Set to "true" to import photos from vCards into LDAP (jpegPhoto attribute). Default is "false".
+CARDDAV_IMPORT_PHOTOS = os.getenv("CARDDAV_IMPORT_PHOTOS")
 
 
 # LDAP server address (e.g., "ldap://localhost:389")
@@ -59,6 +62,7 @@ carddav_base_discovery_url = get_env_or_exit("CARDDAV_BASE_DISCOVERY_URL")
 carddav_username = get_env_or_exit("CARDDAV_USERNAME")
 carddav_password = get_env_or_exit("CARDDAV_PASSWORD")
 ssl_verify = get_boolean_env("CARDDAV_SSL_VERIFY", default=True) # Default to True for security
+import_photos = get_boolean_env("CARDDAV_IMPORT_PHOTOS", default=False) # Default to False for photo import
 
 ldap_server_url = get_env_or_exit("LDAP_SERVER")
 ldap_user = get_env_or_exit("LDAP_USER")
@@ -228,15 +232,39 @@ for book_url in address_book_urls:
             # Extract Telephone numbers
             phones = [t.value for t in getattr(vobj, "tel_list", [])]
 
+            # Handle photo data if CARDDAV_IMPORT_PHOTOS is enabled
+            jpeg_photo_data = None
+            if import_photos:
+                photo_obj = getattr(vobj, 'photo', None)
+                if photo_obj and hasattr(photo_obj, 'value') and photo_obj.value:
+                    if isinstance(photo_obj.value, bytes):
+                        # If vobject already decoded it to bytes, use directly
+                        jpeg_photo_data = photo_obj.value
+                    elif isinstance(photo_obj.value, str):
+                        # If for some reason it's a string, try base64 decoding it
+                        try:
+                            jpeg_photo_data = base64.b64decode(photo_obj.value)
+                        except binascii.Error as decode_err:
+                            print(f"WARNING: Photo data for '{full_name}' from '{book_url}' is string but invalid Base64. Error: {decode_err}. Skipping photo.")
+                            jpeg_photo_data = None
+                        except Exception as decode_err:
+                            print(f"WARNING: Unexpected error decoding photo data for '{full_name}' from '{book_url}'. Error: {decode_err}. Skipping photo.")
+                            jpeg_photo_data = None
+                    else:
+                        print(f"WARNING: Unexpected photo data type for '{full_name}' from '{book_url}': {type(photo_obj.value)}. Skipping photo.")
+                        jpeg_photo_data = None
+
+
             all_parsed_contacts.append({
                 "full_name": full_name,
                 "surname": surname,
                 "given_name": given_name,
                 "emails": emails,
-                "phones": phones
+                "phones": phones,
+                "jpeg_photo": jpeg_photo_data # Add photo data here
             })
         except binascii.Error as e:
-            # Catch specific Base64 decoding errors
+            # Catch specific Base64 decoding errors during initial vCard parsing
             print(f"ERROR: Base64 decoding failed for vCard from {book_url}. Error: {e}. Problematic vCard blob starts: {vcard_blob[:200]}...")
             continue # Skip this problematic vCard and continue with others
         except Exception as e:
@@ -290,6 +318,10 @@ for contact in all_parsed_contacts:
         attributes['mail'] = contact['emails'][0] # Take the first email
     if contact['phones']:
         attributes['telephoneNumber'] = contact['phones'][0] # Take the first phone number
+
+    # Add jpegPhoto attribute if photo data is available
+    if contact['jpeg_photo']:
+        attributes['jpegPhoto'] = contact['jpeg_photo'] # Add the binary photo data
 
     # Debug print for constructed LDAP entry
     print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {attributes}")
