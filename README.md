@@ -39,6 +39,7 @@ Additional (optional) variables are
 CARDDAV_SSL_VERIFY (enabled by default, can be disabled for debugging purposes.)
 LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a path or to false to disable logging to files. Setting LOG_FILE to false is recommended when the project is running flawlessly, to save hard disk space. There is currently no logrotate implemented.)
 DEBUG (Turns on debug logging.)
+CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive secrets like LDAP_PASSWORD and CARDDAV_PASSWORD)
 ```
 
 ## Build and start Containers
