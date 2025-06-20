@@ -39,7 +39,7 @@ Additional (optional) variables are
 CARDDAV_SSL_VERIFY (enabled by default, can be disabled for debugging purposes.)
 LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a path or to false to disable logging to files. Setting LOG_FILE to false is recommended when the project is running flawlessly, to save hard disk space. There is currently no logrotate implemented.)
 DEBUG (Turns on debug logging.)
-CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive secrets like LDAP_PASSWORD and CARDDAV_PASSWORD to stdout AND LOG_FILE (if enabled!))
+CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive secrets like LDAP_PASSWORD and CARDDAV_PASSWORD and sensitive ldap fields like telephoneNumber etc to stdout AND LOG_FILE (if enabled!))
 ```
 
 ## Build and start Containers
@@ -219,7 +219,7 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: :bug: invalidAttributeSyntax for sn
 - [X] fix: :bug: invalidAttributeSyntax for telephoneNumber
 - [X] fix: :bug: invalidAttributeSyntax for mail and others
-- [ ] censor contact information in log files
+- [X] censor contact information in log files
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup
 - [ ] shrink docker image

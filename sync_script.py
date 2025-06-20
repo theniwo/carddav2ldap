@@ -11,7 +11,7 @@ import sys
 import urllib.parse
 import urllib3
 import binascii # Import for Base64 decoding errors
-import base64   # Import for Base64 encoding/decoding if needed for PHOTO field
+import base64   # Import for Base64 encoding/dekoding if needed for PHOTO field
 import re       # Import for regular expressions to clean phone numbers
 
 # --- Environment variable definitions (renamed for carddav2ldap project) ---
@@ -68,6 +68,10 @@ ssl_verify = get_boolean_env("CARDDAV_SSL_VERIFY", default=True) # Default to Tr
 import_photos = get_boolean_env("CARDDAV_IMPORT_PHOTOS", default=False) # Default to False for photo import
 # Use the global 'DEBUG' variable to control Python debug output
 debug_python_enabled = get_boolean_env("DEBUG", default=False)
+
+# Get CENSOR_SECRETS_IN_LOGS setting from environment for Python script
+censor_secrets_in_logs_enabled = get_boolean_env("CENSOR_SECRETS_IN_LOGS", default=True)
+
 
 ldap_server_url = get_env_or_exit("LDAP_SERVER")
 ldap_user = get_env_or_exit("LDAP_USER")
@@ -249,6 +253,20 @@ for book_url in address_book_urls:
             # Extract Telephone numbers
             phones = [t.value for t in getattr(vobj, "tel_list", [])]
 
+            # --- Extract Address Information (Street, City, Postal Code) ---
+            # The ADR property can have multiple parts. We'll take the first one found.
+            # vCard ADR format: Post Office Box;Extended Address;Street Address;Locality;Region;Postal Code;Country Name
+            street_address = ""
+            locality = ""
+            postal_code = ""
+
+            adr_obj_list = getattr(vobj, 'adr_list', [])
+            if adr_obj_list:
+                first_adr = adr_obj_list[0] # Take the first address
+                street_address = getattr(first_adr, 'street', '').strip()
+                locality = getattr(first_adr, 'city', '').strip() # 'city' maps to Locality
+                postal_code = getattr(first_adr, 'code', '').strip() # 'code' maps to Postal Code
+
             # Handle photo data if CARDDAV_IMPORT_PHOTOS is enabled
             jpeg_photo_data = None
             if import_photos:
@@ -278,6 +296,9 @@ for book_url in address_book_urls:
                 "given_name": given_name,
                 "emails": emails,
                 "phones": phones,
+                "street_address": street_address, # New address field
+                "locality": locality,             # New address field
+                "postal_code": postal_code,       # New address field
                 "jpeg_photo": jpeg_photo_data # Add photo data here
             })
         except binascii.Error as e:
@@ -361,13 +382,37 @@ for contact in all_parsed_contacts:
         if cleaned_phone: # Only add if it's not an empty string after cleaning
             attributes['telephoneNumber'] = cleaned_phone
 
+    # Add address attributes only if they have non-empty values
+    if contact['street_address']:
+        attributes['streetAddress'] = contact['street_address']
+    if contact['locality']:
+        attributes['l'] = contact['locality'] # 'l' is for locality/city
+    if contact['postal_code']:
+        attributes['postalCode'] = contact['postal_code']
+
     # Add jpegPhoto attribute if photo data is available
     if contact['jpeg_photo']:
         attributes['jpegPhoto'] = contact['jpeg_photo'] # Add the binary photo data
 
     # Debug print for constructed LDAP entry
     if debug_python_enabled: # Only print if debug_python_enabled
-        print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {attributes}")
+        # Create a copy of attributes to censor for printing
+        display_attributes = attributes.copy()
+        if censor_secrets_in_logs_enabled:
+            # Censor email and phone
+            if 'mail' in display_attributes:
+                display_attributes['mail'] = '[REDACTED_EMAIL]'
+            if 'telephoneNumber' in display_attributes:
+                display_attributes['telephoneNumber'] = '[REDACTED_PHONE]'
+            # Censor address fields
+            if 'streetAddress' in display_attributes:
+                display_attributes['streetAddress'] = '[REDACTED_STREET]'
+            if 'l' in display_attributes:
+                display_attributes['l'] = '[REDACTED_LOCALITY]'
+            if 'postalCode' in display_attributes:
+                display_attributes['postalCode'] = '[REDACTED_POSTAL_CODE]'
+
+        print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {display_attributes}")
         sys.stdout.flush() # Flush print statement immediately
 
     try:
