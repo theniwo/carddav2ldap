@@ -26,6 +26,10 @@ CARDDAV_SSL_VERIFY = os.getenv("CARDDAV_SSL_VERIFY")
 # Set to "true" to import photos from vCards into LDAP (jpegPhoto attribute). Default is "false".
 CARDDAV_IMPORT_PHOTOS = os.getenv("CARDDAV_IMPORT_PHOTOS")
 
+# --- Debugging control for Python script ---
+# This script will now use the global 'DEBUG' environment variable.
+# Set to "true" to enable detailed DEBUG messages within the Python script. Default is "false".
+
 
 # LDAP server address (e.g., "ldap://localhost:389")
 LDAP_SERVER = os.getenv("LDAP_SERVER")
@@ -66,6 +70,8 @@ carddav_username = get_env_or_exit("CARDDAV_USERNAME")
 carddav_password = get_env_or_exit("CARDDAV_PASSWORD")
 ssl_verify = get_boolean_env("CARDDAV_SSL_VERIFY", default=True) # Default to True for security
 import_photos = get_boolean_env("CARDDAV_IMPORT_PHOTOS", default=False) # Default to False for photo import
+# Use the global 'DEBUG' variable to control Python debug output
+debug_python_enabled = get_boolean_env("DEBUG", default=False)
 
 ldap_server_url = get_env_or_exit("LDAP_SERVER")
 ldap_user = get_env_or_exit("LDAP_USER")
@@ -288,14 +294,15 @@ try:
     if not conn.bind():
         print(f"ERROR: LDAP bind failed: {conn.result}")
         # Added debug print for LDAP bind values for invalidDNSyntax diagnosis
-        print(f"DEBUG: LDAP User (bind_dn): '{ldap_user}'")
-        sys.stdout.flush() # Flush print statement immediately
-        print(f"DEBUG: LDAP Password length: {len(ldap_password) if ldap_password else 0} (not printed for security)")
-        sys.stdout.flush() # Flush print statement immediately
-        print(f"DEBUG: LDAP Server URL: '{ldap_server_url}'")
-        sys.stdout.flush() # Flush print statement immediately
-        print(f"DEBUG: LDAP Base DN: '{ldap_base_dn}'") # Crucial for DN syntax
-        sys.stdout.flush() # Flush print statement immediately
+        if debug_python_enabled: # Only print if debug_python_enabled
+            print(f"DEBUG: LDAP User (bind_dn): '{ldap_user}'")
+            sys.stdout.flush() # Flush print statement immediately
+            print(f"DEBUG: LDAP Password length: {len(ldap_password) if ldap_password else 0} (not printed for security)")
+            sys.stdout.flush() # Flush print statement immediately
+            print(f"DEBUG: LDAP Server URL: '{ldap_server_url}'")
+            sys.stdout.flush() # Flush print statement immediately
+            print(f"DEBUG: LDAP Base DN: '{ldap_base_dn}'") # Crucial for DN syntax
+            sys.stdout.flush() # Flush print statement immediately
         sys.exit(1)
     print("Successfully connected and bound to LDAP server.")
 
@@ -334,8 +341,9 @@ for contact in all_parsed_contacts:
         attributes['jpegPhoto'] = contact['jpeg_photo'] # Add the binary photo data
 
     # Debug print for constructed LDAP entry
-    print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {attributes}")
-    sys.stdout.flush() # Flush print statement immediately
+    if debug_python_enabled: # Only print if debug_python_enabled
+        print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {attributes}")
+        sys.stdout.flush() # Flush print statement immediately
 
     try:
         # Attempt to add the entry
