@@ -62,10 +62,22 @@ No such object (32)
 Matched DN: dc=niwo,dc=home
 ```
 
+First we create our admin user
+
+```
+cat admin.ldif
+# Set up admin user
+dn: cn=admin,dc=niwo,dc=home
+objectClass: inetOrgPerson
+cn: admin
+sn: admin
+userPassword:
+```
+
 Next we need to create two OUs
 
-`root@host:# cat base.ldif`
 ```
+cat base.ldif
 # Create OU config
 dn: ou=config,dc=niwo,dc=home
 objectClass: organizationalUnit
@@ -83,15 +95,14 @@ edit base.ldif to your needs and copy it to your "carddav2ldap_ldap_config" dock
 and run
 
 ```
+docker exec -it carddav2ldap-ldap-1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/admin.ldif
 docker exec -it carddav2ldap-ldap-1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/base.ldif
 ```
 
 now you should have
 
 ```
-root@host:# docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
-```
-```
+docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
 SASL/EXTERNAL authentication started
 SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
 SASL SSF: 0
@@ -112,11 +123,17 @@ objectClass: organizationalUnit
 ou: contacts
 ```
 
+Additionally you can test if the login credentials are working
+
+```
+docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -x -D "cn=admin,dc=niwo,dc=home" -w [LDAP_PASSWORD] -b "ou=contacts,dc=niwo,dc=home" -LLL "(objectClass=*)"
+```
+
 ## Add user
 Next we add users to read your ldap directory
 
-`root@host:# cat users.ldif`
 ```
+cat users.ldif
 # Set up Phone user
 dn: cn=phone,ou=contacts,dc=niwo,dc=home
 objectClass: inetOrgPerson
@@ -185,6 +202,9 @@ replace: olcAccess
 olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * read
 ```
 
+```
+docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/acl.ldif
+```
 
 # TODO
 - [X] throw out some default variables from Dockerfile and test missing/unset variables
