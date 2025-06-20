@@ -205,16 +205,16 @@ for book_url in address_book_urls:
 
             # Extract Full Name (FN)
             fn_obj = getattr(vobj, "fn", None)
-            full_name = fn_obj.value if fn_obj else ""
+            full_name = str(fn_obj.value).strip() if fn_obj and fn_obj.value else ""
 
             # Extract Given Name (FIRST NAME from N property) and Surname (LAST NAME from N property)
             given_name = ""
             surname = ""
             n_obj = getattr(vobj, "n", None)
             if n_obj:
-                # Ensure attributes exist before accessing
-                given_name = getattr(n_obj, 'first', '')
-                surname = getattr(n_obj, 'last', '')
+                # Ensure attributes exist before accessing and normalize to str
+                given_name = str(getattr(n_obj, 'first', '')).strip()
+                surname = str(getattr(n_obj, 'last', '')).strip()
 
             # Fallback for full_name if FN is missing (existing logic, adjusted for n_obj attributes)
             if not full_name:
@@ -248,7 +248,7 @@ for book_url in address_book_urls:
 
 
             # Extract Email addresses
-            emails = [e.value for e in getattr(vobj, "email_list", [])]
+            emails = [str(e.value).strip() for e in getattr(vobj, "email_list", []) if e.value]
 
             # --- Extract and categorize Telephone numbers ---
             # Store all cleaned phone numbers in separate lists based on type
@@ -258,7 +258,7 @@ for book_url in address_book_urls:
             fax_numbers = []
 
             for tel_obj in getattr(vobj, "tel_list", []):
-                raw_phone = tel_obj.value
+                raw_phone = str(tel_obj.value).strip()
                 cleaned_phone = re.sub(r'[^0-9+]', '', raw_phone).strip()
                 if cleaned_phone == '+': # Handle case where only '+' remains after cleaning
                     cleaned_phone = ''
@@ -285,9 +285,9 @@ for book_url in address_book_urls:
             adr_obj_list = getattr(vobj, 'adr_list', [])
             if adr_obj_list:
                 first_adr = adr_obj_list[0] # Take the first address
-                street_address = getattr(first_adr, 'street', '').strip()
-                locality = getattr(first_adr, 'city', '').strip() # 'city' maps to Locality
-                postal_code = getattr(first_adr, 'code', '').strip() # 'code' maps to Postal Code
+                street_address = str(getattr(first_adr, 'street', '')).strip()
+                locality = str(getattr(first_adr, 'city', '')).strip() # 'city' maps to Locality
+                postal_code = str(getattr(first_adr, 'code', '')).strip() # 'code' maps to Postal Code
 
             # --- Extract Organization (Company Name) and Organizational Unit (Department) ---
             organization = ""
@@ -296,18 +296,18 @@ for book_url in address_book_urls:
             if org_obj and org_obj.value:
                 if isinstance(org_obj.value, list):
                     if len(org_obj.value) > 0:
-                        organization = org_obj.value[0].strip()
+                        organization = str(org_obj.value[0]).strip()
                     if len(org_obj.value) > 1:
-                        organizational_unit = org_obj.value[1].strip()
+                        organizational_unit = str(org_obj.value[1]).strip()
                 elif isinstance(org_obj.value, str):
                     # Handle single string ORG value, assume it's the organization
-                    organization = org_obj.value.strip()
+                    organization = str(org_obj.value).strip()
 
             # --- Extract Job Title ---
             job_title = ""
             title_obj = getattr(vobj, 'title', None)
             if title_obj and title_obj.value:
-                job_title = title_obj.value.strip()
+                job_title = str(title_obj.value).strip()
 
             # --- Extract Categories ---
             categories = []
@@ -315,9 +315,9 @@ for book_url in address_book_urls:
             if categories_obj and categories_obj.value:
                 # CATEGORIES value can be a comma-separated string or a list
                 if isinstance(categories_obj.value, str):
-                    categories = [cat.strip() for cat in categories_obj.value.split(',') if cat.strip()]
+                    categories = [str(cat).strip() for cat in categories_obj.value.split(',') if str(cat).strip()]
                 elif isinstance(categories_obj.value, list):
-                    categories = [cat.strip() for cat in categories_obj.value if cat.strip()]
+                    categories = [str(cat).strip() for cat in categories_obj.value if str(cat).strip()]
 
             # Handle photo data if CARDDAV_IMPORT_PHOTOS is enabled
             jpeg_photo_data = None
@@ -438,7 +438,7 @@ for contact in all_parsed_contacts:
 
     # Add optional attributes if they exist
     if contact['emails']:
-        raw_email = contact['emails'][0].strip()
+        raw_email = contact['emails'][0] # Already stripped during parsing
         # A very basic email regex, can be expanded if needed
         if re.match(r"[^@]+@[^@]+\.[^@]+", raw_email):
             attributes['mail'] = raw_email # Take the first email if it looks valid
@@ -513,6 +513,7 @@ for contact in all_parsed_contacts:
             if 'businessCategory' in display_attributes:
                 display_attributes['businessCategory'] = ['[REDACTED_CATEGORY]' for _ in display_attributes['businessCategory']]
 
+        print(f"DEBUG: Parsed contact data (before LDAP operation): {contact}") # Added for troubleshooting
         print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {display_attributes}")
         sys.stdout.flush() # Flush print statement immediately
 
