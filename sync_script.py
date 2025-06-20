@@ -522,15 +522,30 @@ for contact in all_parsed_contacts:
         if conn.result['description'] == 'success':
             print(f"Added contact: {contact['full_name']}")
         elif conn.result['description'] == 'entryAlreadyExists':
-            print(f"Contact already exists (skipping update for now): {contact['full_name']}")
-            # Implement update logic here if desired (e.g., conn.modify)
+            print(f"Contact '{contact['full_name']}' already exists. Attempting to update.")
+            # Prepare changes for modify operation
+            changes = {}
+            for attr_name, attr_value in attributes.items():
+                if isinstance(attr_value, list):
+                    # For multi-valued attributes, use the list directly for replacement
+                    changes[attr_name] = [(ldap3.MODIFY_REPLACE, attr_value)]
+                else:
+                    # For single-valued attributes, wrap in a list for replacement
+                    changes[attr_name] = [(ldap3.MODIFY_REPLACE, [attr_value])]
+
+            # Perform the modify operation
+            conn.modify(ldap_dn, changes)
+            if conn.result['description'] == 'success':
+                print(f"Updated contact: {contact['full_name']}")
+            else:
+                print(f"WARNING: Failed to update contact {contact['full_name']}: {conn.result}")
         else:
             print(f"WARNING: Failed to add/update contact {contact['full_name']}: {conn.result}")
 
-    except LDAPEntryAlreadyExistsResult: # Catching the specific exception
-        print(f"Contact '{contact['full_name']}' already exists in LDAP. Skipping.")
+    except LDAPEntryAlreadyExistsResult: # This specific exception is now handled within the try block
+        pass # The logic for update is now within the 'elif' condition for 'entryAlreadyExists'
     except Exception as e:
-        print(f"ERROR: Failed to add contact '{contact['full_name']}' to LDAP: {e}")
+        print(f"ERROR: Failed to add/update contact '{contact['full_name']}' to LDAP: {e}")
 
 # --- 5. Disconnect from LDAP ---
 conn.unbind()
