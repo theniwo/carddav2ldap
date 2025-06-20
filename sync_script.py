@@ -145,7 +145,7 @@ for response_elem in discovery_root.findall(".//d:response", discovery_ns):
 if not address_book_urls:
     print("WARNING: No address books found at the specified CARDDAV_BASE_DISCOVERY_URL.")
     # Attempt to use CARDDAV_BASE_DISCOVERY_URL itself as a single address book if no others found.
-    # This covers cases where the discovery URL IS the address book.
+    # This covers cases where the discovery URL IS the the address book.
     print(f"Attempting to use {carddav_base_discovery_url} as a single address book.")
     address_book_urls.append(carddav_base_discovery_url)
 
@@ -479,11 +479,15 @@ for contact in all_parsed_contacts:
         # For display, values should be strings. Decode bytes if they were explicitly encoded.
         display_attributes = {}
         for key, value in attributes.items():
-            if isinstance(value, list):
+            if key == 'jpegPhoto': # Handle binary photo data separately
+                # Do not attempt to decode binary photo data as UTF-8
+                display_attributes[key] = '[REDACTED_PHOTO_DATA]' if censor_secrets_in_logs_enabled else 'Bytes (not displayed)'
+            elif isinstance(value, list):
                 # Ensure all elements in lists are strings for display
-                display_attributes[key] = [v.decode('utf-8') if isinstance(v, bytes) else str(v) for v in value]
+                # Only decode if the item is bytes, otherwise keep as is (already string or other type)
+                display_attributes[key] = [v.decode('utf-8') if isinstance(v, bytes) else v for v in value]
             elif isinstance(value, bytes):
-                # Decode bytes to string for display
+                # Decode bytes to string for display (for other string attributes that were encoded)
                 display_attributes[key] = value.decode('utf-8')
             else:
                 # Use value as is (already string or other type)
