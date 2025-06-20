@@ -340,9 +340,26 @@ for contact in all_parsed_contacts:
 
     # Add optional attributes if they exist
     if contact['emails']:
-        attributes['mail'] = contact['emails'][0] # Take the first email
+        raw_email = contact['emails'][0].strip()
+        # A very basic email regex, can be expanded if needed
+        if re.match(r"[^@]+@[^@]+\.[^@]+", raw_email):
+            attributes['mail'] = raw_email # Take the first email if it looks valid
+        else:
+            print(f"WARNING: Email for '{contact['full_name']}' is malformed: '{raw_email}'. Skipping email attribute.")
+
     if contact['phones']:
-        attributes['telephoneNumber'] = contact['phones'][0] # Take the first phone number
+        raw_phone = contact['phones'][0]
+        # Remove any characters that are not digits or a leading plus sign
+        # This ensures stricter compliance with typical telephoneNumber syntax in LDAP
+        cleaned_phone = re.sub(r'[^0-9+]', '', raw_phone).strip()
+
+        # If after cleaning, the phone number is just '+' (e.g., from an input like "+ -"),
+        # treat it as an empty string.
+        if cleaned_phone == '+':
+            cleaned_phone = ''
+
+        if cleaned_phone: # Only add if it's not an empty string after cleaning
+            attributes['telephoneNumber'] = cleaned_phone
 
     # Add jpegPhoto attribute if photo data is available
     if contact['jpeg_photo']:

@@ -218,7 +218,7 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: :bug: DEBUG messages appear in python script only when DEBUG=true
 - [X] fix: :bug: invalidAttributeSyntax for sn
 - [X] fix: :bug: invalidAttributeSyntax for telephoneNumber
-- [ ] fix: :bug: invalidAttributeSyntax for mail and others
+- [X] fix: :bug: invalidAttributeSyntax for mail and others
 - [ ] censor contact information in log files
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup
