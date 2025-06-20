@@ -374,10 +374,11 @@ print(f"Successfully parsed a total of {len(all_parsed_contacts)} contacts from 
 # --- 3. Connect to LDAP Server ---
 try:
     server = ldap3.Server(ldap_server_url, port=389, use_ssl=False) # Adjust port and use_ssl if needed
-    # Explicitly set client_encoding to 'utf-8' for robust handling of special characters
+    # client_encoding was removed as it caused 'unexpected keyword argument' error on some ldap3 versions.
+    # Python 3 strings are Unicode, and ldap3 should handle UTF-8 encoding by default.
     conn = ldap3.Connection(server, user=ldap_user, password=ldap_password,
                       auto_bind=True, client_strategy='SYNC', # Changed to string literal 'SYNC'
-                      authentication='SIMPLE', client_encoding='utf-8') # Added client_encoding
+                      authentication='SIMPLE') # Changed to string literal 'SIMPLE'
 
     if not conn.bind():
         print(f"ERROR: LDAP bind failed: {conn.result}")
@@ -411,67 +412,66 @@ for contact in all_parsed_contacts:
     ldap_dn = f"cn={contact['full_name']},{ldap_base_dn}"
 
     # Define LDAP attributes for the entry
-    # All values are now expected to be Python unicode strings from parsing,
-    # and will be encoded to bytes by ldap3 if client_encoding is set.
+    # All values are now expected to be Python unicode strings from parsing.
+    # We will explicitly encode them to bytes before sending to LDAP, to enforce UTF-8.
     attributes = {
         'objectClass': ['inetOrgPerson', 'organizationalPerson', 'person', 'top'], # Added organizationalPerson and person
-        'cn': contact['full_name'],
-        'sn': contact['surname'] # 'surname' will now always have a value (or "N/A")
+        'cn': contact['full_name'].encode('utf-8'), # Explicitly encode
+        'sn': contact['surname'].encode('utf-8') # Explicitly encode
     }
 
     # Add givenName attribute ONLY if it has a non-empty value
     if contact['given_name']:
-        attributes['givenName'] = contact['given_name']
+        attributes['givenName'] = contact['given_name'].encode('utf-8') # Explicitly encode
 
     # Add various phone number attributes
     # telephoneNumber (general) should take only the first available number if multi-valued is not supported.
     if contact['all_phones']:
         # If 'telephoneNumber' in your LDAP schema is single-valued, take only the first.
-        # Based on previous errors, we assume it's single-valued.
-        attributes['telephoneNumber'] = contact['all_phones'][0]
+        attributes['telephoneNumber'] = contact['all_phones'][0].encode('utf-8') # Explicitly encode
     if contact['home_phones']:
-        attributes['homePhone'] = contact['home_phones']
+        attributes['homePhone'] = [p.encode('utf-8') for p in contact['home_phones']] # Explicitly encode list elements
     if contact['mobile_phones']:
-        attributes['mobile'] = contact['mobile_phones']
+        attributes['mobile'] = [p.encode('utf-8') for p in contact['mobile_phones']] # Explicitly encode list elements
     if contact['fax_numbers']:
-        attributes['facsimileTelephoneNumber'] = contact['fax_numbers']
+        attributes['facsimileTelephoneNumber'] = [p.encode('utf-8') for p in contact['fax_numbers']] # Explicitly encode list elements
 
     # Add optional attributes if they exist
     if contact['emails']:
         raw_email = contact['emails'][0] # Already stripped during parsing
         # A very basic email regex, can be expanded if needed
         if re.match(r"[^@]+@[^@]+\.[^@]+", raw_email):
-            attributes['mail'] = raw_email # Take the first email if it looks valid
+            attributes['mail'] = raw_email.encode('utf-8') # Explicitly encode
         else:
             print(f"WARNING: Email for '{contact['full_name']}' is malformed: '{raw_email}'. Skipping email attribute.")
 
     # Add address attributes only if they have non-empty values
     if contact['street_address']:
-        attributes['streetAddress'] = contact['street_address']
+        attributes['streetAddress'] = contact['street_address'].encode('utf-8') # Explicitly encode
     if contact['locality']:
-        attributes['l'] = contact['locality'] # 'l' is for locality/city
+        attributes['l'] = contact['locality'].encode('utf-8') # Explicitly encode
     if contact['postal_code']:
-        attributes['postalCode'] = contact['postal_code']
+        attributes['postalCode'] = contact['postal_code'].encode('utf-8') # Explicitly encode
 
     # Add Organization (Company Name)
     if contact['organization']:
-        attributes['o'] = contact['organization'] # 'o' for organizationName
+        attributes['o'] = contact['organization'].encode('utf-8') # Explicitly encode
 
     # Add Organizational Unit (Department)
     if contact['organizational_unit']:
-        attributes['ou'] = contact['organizational_unit'] # 'ou' for organizationalUnitName
+        attributes['ou'] = contact['organizational_unit'].encode('utf-8') # Explicitly encode
 
     # Add Job Title
     if contact['job_title']:
-        attributes['title'] = contact['job_title']
+        attributes['title'] = contact['job_title'].encode('utf-8') # Explicitly encode
 
     # Add Categories
     if contact['categories']:
-        attributes['businessCategory'] = contact['categories'] # 'businessCategory' is multi-valued
+        attributes['businessCategory'] = [c.encode('utf-8') for c in contact['categories']] # Explicitly encode list elements
 
     # Add jpegPhoto attribute if photo data is available
     if contact['jpeg_photo']:
-        attributes['jpegPhoto'] = contact['jpeg_photo'] # Add the binary photo data
+        attributes['jpegPhoto'] = contact['jpeg_photo'] # Already bytes or None
 
     # Debug print for constructed LDAP entry
     if debug_python_enabled: # Only print if debug_python_enabled
