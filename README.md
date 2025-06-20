@@ -40,6 +40,7 @@ CARDDAV_SSL_VERIFY (enabled by default, can be disabled for debugging purposes.)
 LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a path or to false to disable logging to files. Setting LOG_FILE to false is recommended when the project is running flawlessly, to save hard disk space. There is currently no logrotate implemented.)
 DEBUG (Turns on debug logging.)
 CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive secrets like LDAP_PASSWORD and CARDDAV_PASSWORD and sensitive ldap fields like telephoneNumber etc to stdout AND LOG_FILE (if enabled!))
+WARNING_TIMEOUT_SECONDS (Timeout in seconds for warning screen that is displayed, when CENSOR_SECRETS_IN_LOGS is set to false. Default is 30 seconds.)
 ```
 
 ## Build and start Containers
@@ -219,8 +220,8 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: :bug: invalidAttributeSyntax for sn
 - [X] fix: :bug: invalidAttributeSyntax for telephoneNumber
 - [X] fix: :bug: invalidAttributeSyntax for mail and others
-- [X] censor contact information in log files
-- [ ] add saftey timeout to display warning message
+- [X] feat: add and censor contact information in log files
+- [X] add saftey timeout to display warning message
 - [ ] fetch all phone and fax numbers
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup

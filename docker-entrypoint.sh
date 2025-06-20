@@ -7,6 +7,10 @@ if [[ -n "${CENSOR_SECRETS_IN_LOGS}" && "${CENSOR_SECRETS_IN_LOGS,,}" == "false"
     CENSOR_SECRETS_IN_LOGS_ENABLED=false
 fi
 
+# Get WARNING_TIMEOUT_SECONDS setting (default to 30 seconds)
+WARNING_TIMEOUT_SECONDS_DEFAULT=30
+WARNING_TIMEOUT_SECONDS=${WARNING_TIMEOUT_SECONDS:-$WARNING_TIMEOUT_SECONDS_DEFAULT}
+
 # IMPORTANT WARNING: Display a prominent warning if password logging is not censored
 if [[ "$CENSOR_SECRETS_IN_LOGS_ENABLED" == "false" ]]; then
     echo "========================================================================" >&2
@@ -14,7 +18,9 @@ if [[ "$CENSOR_SECRETS_IN_LOGS_ENABLED" == "false" ]]; then
     echo "         LDAP and CARDDAV passwords WILL be visible in Docker logs and" >&2
     echo "         file logs (if enabled). This is a SECURITY RISK!" >&2
     echo "         Set CENSOR_SECRETS_IN_LOGS=true to redact passwords!" >&2
+    echo "         This warning will pause execution for ${WARNING_TIMEOUT_SECONDS} seconds." >&2 # Added timeout info
     echo "========================================================================" >&2
+    sleep "$WARNING_TIMEOUT_SECONDS" # Pause execution for visibility
 fi
 
 # Activate debugging (set -eux) only if DEBUG is set to "true" (case-insensitive)
