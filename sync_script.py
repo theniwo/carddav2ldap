@@ -289,6 +289,36 @@ for book_url in address_book_urls:
                 locality = getattr(first_adr, 'city', '').strip() # 'city' maps to Locality
                 postal_code = getattr(first_adr, 'code', '').strip() # 'code' maps to Postal Code
 
+            # --- Extract Organization (Company Name) and Organizational Unit (Department) ---
+            organization = ""
+            organizational_unit = ""
+            org_obj = getattr(vobj, 'org', None)
+            if org_obj and org_obj.value:
+                if isinstance(org_obj.value, list):
+                    if len(org_obj.value) > 0:
+                        organization = org_obj.value[0].strip()
+                    if len(org_obj.value) > 1:
+                        organizational_unit = org_obj.value[1].strip()
+                elif isinstance(org_obj.value, str):
+                    # Handle single string ORG value, assume it's the organization
+                    organization = org_obj.value.strip()
+
+            # --- Extract Job Title ---
+            job_title = ""
+            title_obj = getattr(vobj, 'title', None)
+            if title_obj and title_obj.value:
+                job_title = title_obj.value.strip()
+
+            # --- Extract Categories ---
+            categories = []
+            categories_obj = getattr(vobj, 'categories', None)
+            if categories_obj and categories_obj.value:
+                # CATEGORIES value can be a comma-separated string or a list
+                if isinstance(categories_obj.value, str):
+                    categories = [cat.strip() for cat in categories_obj.value.split(',') if cat.strip()]
+                elif isinstance(categories_obj.value, list):
+                    categories = [cat.strip() for cat in categories_obj.value if cat.strip()]
+
             # Handle photo data if CARDDAV_IMPORT_PHOTOS is enabled
             jpeg_photo_data = None
             if import_photos:
@@ -324,6 +354,10 @@ for book_url in address_book_urls:
                 "street_address": street_address, # New address field
                 "locality": locality,             # New address field
                 "postal_code": postal_code,       # New address field
+                "organization": organization,     # New organization field
+                "organizational_unit": organizational_unit, # New organizational unit field
+                "job_title": job_title,           # New job title field
+                "categories": categories,         # New categories field
                 "jpeg_photo": jpeg_photo_data # Add photo data here
             })
         except binascii.Error as e:
@@ -419,6 +453,22 @@ for contact in all_parsed_contacts:
     if contact['postal_code']:
         attributes['postalCode'] = contact['postal_code']
 
+    # Add Organization (Company Name)
+    if contact['organization']:
+        attributes['o'] = contact['organization'] # 'o' for organizationName
+
+    # Add Organizational Unit (Department)
+    if contact['organizational_unit']:
+        attributes['ou'] = contact['organizational_unit'] # 'ou' for organizationalUnitName
+
+    # Add Job Title
+    if contact['job_title']:
+        attributes['title'] = contact['job_title']
+
+    # Add Categories
+    if contact['categories']:
+        attributes['businessCategory'] = contact['categories'] # 'businessCategory' is multi-valued
+
     # Add jpegPhoto attribute if photo data is available
     if contact['jpeg_photo']:
         attributes['jpegPhoto'] = contact['jpeg_photo'] # Add the binary photo data
@@ -453,6 +503,15 @@ for contact in all_parsed_contacts:
                 display_attributes['l'] = '[REDACTED_LOCALITY]'
             if 'postalCode' in display_attributes:
                 display_attributes['postalCode'] = '[REDACTED_POSTAL_CODE]'
+            # Censor organization and categories
+            if 'o' in display_attributes:
+                display_attributes['o'] = '[REDACTED_ORG]'
+            if 'ou' in display_attributes:
+                display_attributes['ou'] = '[REDACTED_OU]'
+            if 'title' in display_attributes:
+                display_attributes['title'] = '[REDACTED_TITLE]'
+            if 'businessCategory' in display_attributes:
+                display_attributes['businessCategory'] = ['[REDACTED_CATEGORY]' for _ in display_attributes['businessCategory']]
 
         print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {display_attributes}")
         sys.stdout.flush() # Flush print statement immediately
