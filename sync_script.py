@@ -15,7 +15,7 @@ import base64   # Import for Base64 encoding/dekoding if needed for PHOTO field
 import re       # Import for regular expressions to clean phone numbers
 
 # --- Environment variable definitions (renamed for carddav2ldap project) ---
-# CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
+# CardDAV base URL for discovering address books (e.g., "[https://your.carddav.server/dav.php/addressbooks/user/](https://your.carddav.server/dav.php/addressbooks/user/)")
 # This URL should list all your address books as sub-collections.
 CARDDAV_BASE_DISCOVERY_URL = os.getenv("CARDDAV_BASE_DISCOVERY_URL")
 # CardDAV username
