@@ -75,7 +75,7 @@ censor_secrets_in_logs_enabled = get_boolean_env("CENSOR_SECRETS_IN_LOGS", defau
 
 ldap_server_url = get_env_or_exit("LDAP_SERVER")
 ldap_user = get_env_or_exit("LDAP_USER")
-ldap_password = get_env_or_exit("LDAP_PASSWORD")
+ldap_password = os.getenv("LDAP_PASSWORD") # Get password value as is for ldap3 bind
 ldap_base_dn = get_env_or_exit("LDAP_BASE_DN")
 
 # Suppress InsecureRequestWarning if SSL verification is disabled
@@ -326,7 +326,11 @@ try:
         if debug_python_enabled: # Only print if debug_python_enabled
             print(f"DEBUG: LDAP User (bind_dn): '{ldap_user}'")
             sys.stdout.flush() # Flush print statement immediately
-            print(f"DEBUG: LDAP Password length: {len(ldap_password) if ldap_password else 0} (not printed for security)")
+            # Censor password length if required by CENSOR_SECRETS_IN_LOGS
+            if censor_secrets_in_logs_enabled:
+                print(f"DEBUG: LDAP Password: [REDACTED]")
+            else:
+                print(f"DEBUG: LDAP Password length: {len(ldap_password) if ldap_password else 0} (not printed for security)")
             sys.stdout.flush() # Flush print statement immediately
             print(f"DEBUG: LDAP Server URL: '{ldap_server_url}'")
             sys.stdout.flush() # Flush print statement immediately
