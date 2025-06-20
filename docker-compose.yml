@@ -36,3 +36,12 @@ services:
     ports:
       - "8080:80"
 
+  phpldapadmin:
+    image: osixia/phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: ${LDAP_HOST}
+      PHPLDAPADMIN_HTTPS: ${HTTPS}
+    ports:
+      - "${ADMIN_PORT}:80"
+    depends_on:
+      - ldap
