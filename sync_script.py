@@ -63,7 +63,7 @@ def get_boolean_env(var_name, default=False):
 # --- Fetch environment variables ---
 carddav_base_discovery_url = get_env_or_exit("CARDDAV_BASE_DISCOVERY_URL")
 carddav_username = get_env_or_exit("CARDDAV_USERNAME")
-carddav_password = get_env_or_exit("CARDDAV_PASSWORD")
+carddav_password = os.getenv("CARDDAV_PASSWORD") # Get password value as is for requests auth
 ssl_verify = get_boolean_env("CARDDAV_SSL_VERIFY", default=True) # Default to True for security
 import_photos = get_boolean_env("CARDDAV_IMPORT_PHOTOS", default=False) # Default to False for photo import
 # Use the global 'DEBUG' variable to control Python debug output
@@ -250,8 +250,30 @@ for book_url in address_book_urls:
             # Extract Email addresses
             emails = [e.value for e in getattr(vobj, "email_list", [])]
 
-            # Extract Telephone numbers
-            phones = [t.value for t in getattr(vobj, "tel_list", [])]
+            # --- Extract and categorize Telephone numbers ---
+            # Store all cleaned phone numbers in separate lists based on type
+            all_cleaned_phones = [] # For the general 'telephoneNumber' attribute
+            home_phones = []
+            mobile_phones = []
+            fax_numbers = []
+
+            for tel_obj in getattr(vobj, "tel_list", []):
+                raw_phone = tel_obj.value
+                cleaned_phone = re.sub(r'[^0-9+]', '', raw_phone).strip()
+                if cleaned_phone == '+': # Handle case where only '+' remains after cleaning
+                    cleaned_phone = ''
+
+                if cleaned_phone: # Only process non-empty cleaned numbers
+                    all_cleaned_phones.append(cleaned_phone) # Add to general list
+
+                    types = [t.upper() for t in getattr(tel_obj, 'type_param', [])]
+
+                    if 'FAX' in types:
+                        fax_numbers.append(cleaned_phone)
+                    if 'CELL' in types or 'MOBILE' in types:
+                        mobile_phones.append(cleaned_phone)
+                    if 'HOME' in types:
+                        home_phones.append(cleaned_phone)
 
             # --- Extract Address Information (Street, City, Postal Code) ---
             # The ADR property can have multiple parts. We'll take the first one found.
@@ -295,7 +317,10 @@ for book_url in address_book_urls:
                 "surname": surname,
                 "given_name": given_name,
                 "emails": emails,
-                "phones": phones,
+                "all_phones": all_cleaned_phones, # General list of all phones
+                "home_phones": home_phones,
+                "mobile_phones": mobile_phones,
+                "fax_numbers": fax_numbers,
                 "street_address": street_address, # New address field
                 "locality": locality,             # New address field
                 "postal_code": postal_code,       # New address field
@@ -326,7 +351,7 @@ try:
         if debug_python_enabled: # Only print if debug_python_enabled
             print(f"DEBUG: LDAP User (bind_dn): '{ldap_user}'")
             sys.stdout.flush() # Flush print statement immediately
-            # Censor password length if required by CENSOR_SECRETS_IN_LOGS
+            # Censor password if required by CENSOR_SECRETS_IN_LOGS
             if censor_secrets_in_logs_enabled:
                 print(f"DEBUG: LDAP Password: [REDACTED]")
             else:
@@ -363,6 +388,16 @@ for contact in all_parsed_contacts:
     if contact['given_name']:
         attributes['givenName'] = contact['given_name']
 
+    # Add various phone number attributes
+    if contact['all_phones']:
+        attributes['telephoneNumber'] = contact['all_phones']
+    if contact['home_phones']:
+        attributes['homePhone'] = contact['home_phones']
+    if contact['mobile_phones']:
+        attributes['mobile'] = contact['mobile_phones']
+    if contact['fax_numbers']:
+        attributes['facsimileTelephoneNumber'] = contact['fax_numbers']
+
     # Add optional attributes if they exist
     if contact['emails']:
         raw_email = contact['emails'][0].strip()
@@ -371,20 +406,6 @@ for contact in all_parsed_contacts:
             attributes['mail'] = raw_email # Take the first email if it looks valid
         else:
             print(f"WARNING: Email for '{contact['full_name']}' is malformed: '{raw_email}'. Skipping email attribute.")
-
-    if contact['phones']:
-        raw_phone = contact['phones'][0]
-        # Remove any characters that are not digits or a leading plus sign
-        # This ensures stricter compliance with typical telephoneNumber syntax in LDAP
-        cleaned_phone = re.sub(r'[^0-9+]', '', raw_phone).strip()
-
-        # If after cleaning, the phone number is just '+' (e.g., from an input like "+ -"),
-        # treat it as an empty string.
-        if cleaned_phone == '+':
-            cleaned_phone = ''
-
-        if cleaned_phone: # Only add if it's not an empty string after cleaning
-            attributes['telephoneNumber'] = cleaned_phone
 
     # Add address attributes only if they have non-empty values
     if contact['street_address']:
@@ -407,7 +428,14 @@ for contact in all_parsed_contacts:
             if 'mail' in display_attributes:
                 display_attributes['mail'] = '[REDACTED_EMAIL]'
             if 'telephoneNumber' in display_attributes:
-                display_attributes['telephoneNumber'] = '[REDACTED_PHONE]'
+                # Iterate and redact each phone number in the list
+                display_attributes['telephoneNumber'] = ['[REDACTED_PHONE]' for _ in display_attributes['telephoneNumber']]
+            if 'homePhone' in display_attributes:
+                display_attributes['homePhone'] = ['[REDACTED_PHONE]' for _ in display_attributes['homePhone']]
+            if 'mobile' in display_attributes:
+                display_attributes['mobile'] = ['[REDACTED_PHONE]' for _ in display_attributes['mobile']]
+            if 'facsimileTelephoneNumber' in display_attributes:
+                display_attributes['facsimileTelephoneNumber'] = ['[REDACTED_FAX]' for _ in display_attributes['facsimileTelephoneNumber']]
             # Censor address fields
             if 'streetAddress' in display_attributes:
                 display_attributes['streetAddress'] = '[REDACTED_STREET]'
