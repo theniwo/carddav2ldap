@@ -516,7 +516,7 @@ for contact in all_parsed_contacts:
             if 'l' in display_attributes:
                 display_attributes['l'] = '[REDACTED_LOCALITY]'
             if 'postalCode' in display_attributes:
-                display_attributes['postalCode'] = '[REDACTED_POSTAL_CODE]'
+                display_attributes['postalCode'] = ['[REDACTED_POSTAL_CODE]' for _ in display_attributes['postalCode']]
             # Censor organization and categories
             if 'o' in display_attributes:
                 display_attributes['o'] = '[REDACTED_ORG]'
