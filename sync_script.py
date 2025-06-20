@@ -379,7 +379,7 @@ for contact in all_parsed_contacts:
 
     # Define LDAP attributes for the entry
     attributes = {
-        'objectClass': ['inetOrgPerson', 'top'], # Required object classes for a person entry
+        'objectClass': ['inetOrgPerson', 'organizationalPerson', 'person', 'top'], # Added organizationalPerson and person
         'cn': contact['full_name'],
         'sn': contact['surname'] # 'surname' will now always have a value (or "N/A")
     }
@@ -389,8 +389,12 @@ for contact in all_parsed_contacts:
         attributes['givenName'] = contact['given_name']
 
     # Add various phone number attributes
+    # telephoneNumber (general) should take only the first available number if multi-valued is not supported.
     if contact['all_phones']:
-        attributes['telephoneNumber'] = contact['all_phones']
+        # If 'telephoneNumber' in your LDAP schema is single-valued, take only the first.
+        # Otherwise, assign the whole list: attributes['telephoneNumber'] = contact['all_phones']
+        # Based on previous errors, we assume it's single-valued.
+        attributes['telephoneNumber'] = contact['all_phones'][0]
     if contact['home_phones']:
         attributes['homePhone'] = contact['home_phones']
     if contact['mobile_phones']:
@@ -427,9 +431,15 @@ for contact in all_parsed_contacts:
             # Censor email and phone
             if 'mail' in display_attributes:
                 display_attributes['mail'] = '[REDACTED_EMAIL]'
+            # Censor all phone list attributes
             if 'telephoneNumber' in display_attributes:
-                # Iterate and redact each phone number in the list
-                display_attributes['telephoneNumber'] = ['[REDACTED_PHONE]' for _ in display_attributes['telephoneNumber']]
+                # If telephoneNumber is a string (single value), redact it directly
+                if isinstance(display_attributes['telephoneNumber'], str):
+                    display_attributes['telephoneNumber'] = '[REDACTED_PHONE]'
+                # If it's a list (shouldn't happen for the first one if fix works, but defensive), redact elements
+                elif isinstance(display_attributes['telephoneNumber'], list):
+                    display_attributes['telephoneNumber'] = ['[REDACTED_PHONE]' for _ in display_attributes['telephoneNumber']]
+
             if 'homePhone' in display_attributes:
                 display_attributes['homePhone'] = ['[REDACTED_PHONE]' for _ in display_attributes['homePhone']]
             if 'mobile' in display_attributes:
