@@ -34,7 +34,17 @@ mkdir -p "$(dirname "$ENV_FILE")"
 # IMPORTANT: Passwords are NOT redacted at this stage, so the original values are preserved.
 # The format "export VAR=VALUE" is crucial for sourcing.
 # We ensure values with spaces are properly quoted.
-printenv | awk -F'=' '{ print "export " $1 "=\"" $2 "\"" }' > "$ENV_FILE"
+# The 'awk' command is adjusted to handle '=' signs within variable values correctly.
+printenv | awk 'BEGIN {FS="="} {
+    if (NF > 1) {
+        # Print "export VAR_NAME=\"FULL_VALUE\""
+        # Full value is everything after the first '='
+        printf "export %s=\"%s\"\n", $1, substr($0, index($0,"=")+1)
+    } else {
+        # Handle cases where there is no '=' in the variable (e.g., just a flag)
+        printf "export %s=\"\"\n", $1
+    }
+}' > "$ENV_FILE"
 
 # Debugging-Ausgabe der generierten Umgebungsvariablen-Datei
 # Diese Ausgabe wird nur angezeigt, wenn DEBUG=true gesetzt ist.

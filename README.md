@@ -193,7 +193,7 @@ olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * r
 - [X] LOG_FILE=true
 - [X] Test Logging
 - [X] Added feature to control secret censoring
-- [ ] fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
+- [X] fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup
 - [ ] shrink docker image
