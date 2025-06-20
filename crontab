@@ -6,4 +6,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Führt sync_script.sh direkt aus. Das Skript selbst sourcet nun die Umgebung.
 # Alle Ausgaben von sync_script.sh werden von seiner internen log_and_tee-Funktion
 # an /dev/stdout geleitet. Diese Ausgaben werden dann vom Docker-Prozess erfasst.
+@reboot /bin/bash -c "/app/sync_script.sh" >> /proc/1/fd/1 2>&1
+#* * * * * /bin/bash -c "/app/sync_script.sh" >> /proc/1/fd/1 2>&1
 */30 * * * * /bin/bash -c "/app/sync_script.sh" >> /proc/1/fd/1 2>&1
