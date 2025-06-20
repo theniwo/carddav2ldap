@@ -220,6 +220,8 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: :bug: invalidAttributeSyntax for telephoneNumber
 - [X] fix: :bug: invalidAttributeSyntax for mail and others
 - [X] censor contact information in log files
+- [ ] add saftey timeout to display warning message
+- [ ] fetch all phone and fax numbers
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup
 - [ ] shrink docker image
