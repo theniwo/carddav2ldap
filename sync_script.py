@@ -374,10 +374,10 @@ print(f"Successfully parsed a total of {len(all_parsed_contacts)} contacts from 
 # --- 3. Connect to LDAP Server ---
 try:
     server = ldap3.Server(ldap_server_url, port=389, use_ssl=False) # Adjust port and use_ssl if needed
-    # Using string literals for client_strategy and authentication
+    # Explicitly set client_encoding to 'utf-8' for robust handling of special characters
     conn = ldap3.Connection(server, user=ldap_user, password=ldap_password,
                       auto_bind=True, client_strategy='SYNC', # Changed to string literal 'SYNC'
-                      authentication='SIMPLE') # Changed to string literal 'SIMPLE'
+                      authentication='SIMPLE', client_encoding='utf-8') # Added client_encoding
 
     if not conn.bind():
         print(f"ERROR: LDAP bind failed: {conn.result}")
@@ -407,11 +407,12 @@ print("Importing contacts into LDAP...")
 for contact in all_parsed_contacts:
     # Construct the DN (Distinguished Name) for the LDAP entry
     # Using 'cn' (Common Name) for the RDN (Relative Distinguished Name)
-    # Be careful with special characters in full_name for DN. It's good practice to sanitize/escape.
-    # For simplicity, we are using it directly here.
+    # Ensure CN is properly encoded for the DN string itself
     ldap_dn = f"cn={contact['full_name']},{ldap_base_dn}"
 
     # Define LDAP attributes for the entry
+    # All values are now expected to be Python unicode strings from parsing,
+    # and will be encoded to bytes by ldap3 if client_encoding is set.
     attributes = {
         'objectClass': ['inetOrgPerson', 'organizationalPerson', 'person', 'top'], # Added organizationalPerson and person
         'cn': contact['full_name'],
@@ -426,7 +427,6 @@ for contact in all_parsed_contacts:
     # telephoneNumber (general) should take only the first available number if multi-valued is not supported.
     if contact['all_phones']:
         # If 'telephoneNumber' in your LDAP schema is single-valued, take only the first.
-        # Otherwise, assign the whole list: attributes['telephoneNumber'] = contact['all_phones']
         # Based on previous errors, we assume it's single-valued.
         attributes['telephoneNumber'] = contact['all_phones'][0]
     if contact['home_phones']:
@@ -476,17 +476,27 @@ for contact in all_parsed_contacts:
     # Debug print for constructed LDAP entry
     if debug_python_enabled: # Only print if debug_python_enabled
         # Create a copy of attributes to censor for printing
-        display_attributes = attributes.copy()
+        # For display, values should be strings. Decode bytes if they were explicitly encoded.
+        display_attributes = {}
+        for key, value in attributes.items():
+            if isinstance(value, list):
+                # Ensure all elements in lists are strings for display
+                display_attributes[key] = [v.decode('utf-8') if isinstance(v, bytes) else str(v) for v in value]
+            elif isinstance(value, bytes):
+                # Decode bytes to string for display
+                display_attributes[key] = value.decode('utf-8')
+            else:
+                # Use value as is (already string or other type)
+                display_attributes[key] = value
+
         if censor_secrets_in_logs_enabled:
             # Censor email and phone
             if 'mail' in display_attributes:
                 display_attributes['mail'] = '[REDACTED_EMAIL]'
             # Censor all phone list attributes
             if 'telephoneNumber' in display_attributes:
-                # If telephoneNumber is a string (single value), redact it directly
                 if isinstance(display_attributes['telephoneNumber'], str):
                     display_attributes['telephoneNumber'] = '[REDACTED_PHONE]'
-                # If it's a list (shouldn't happen for the first one if fix works, but defensive), redact elements
                 elif isinstance(display_attributes['telephoneNumber'], list):
                     display_attributes['telephoneNumber'] = ['[REDACTED_PHONE]' for _ in display_attributes['telephoneNumber']]
 
