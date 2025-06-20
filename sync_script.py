@@ -316,9 +316,12 @@ for contact in all_parsed_contacts:
     attributes = {
         'objectClass': ['inetOrgPerson', 'top'], # Required object classes for a person entry
         'cn': contact['full_name'],
-        'sn': contact['surname'],
-        'givenName': contact['given_name'] # Add givenName, even if empty
+        'sn': contact['surname']
     }
+
+    # Add givenName attribute ONLY if it has a non-empty value
+    if contact['given_name']:
+        attributes['givenName'] = contact['given_name']
 
     # Add optional attributes if they exist
     if contact['emails']:
