@@ -12,6 +12,7 @@ import urllib.parse
 import urllib3
 import binascii # Import for Base64 decoding errors
 import base64   # Import for Base64 encoding/decoding if needed for PHOTO field
+import re       # Import for regular expressions to clean phone numbers
 
 # --- Environment variable definitions (renamed for carddav2ldap project) ---
 # CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
@@ -25,11 +26,6 @@ CARDDAV_PASSWORD = os.getenv("CARDDAV_PASSWORD")
 CARDDAV_SSL_VERIFY = os.getenv("CARDDAV_SSL_VERIFY")
 # Set to "true" to import photos from vCards into LDAP (jpegPhoto attribute). Default is "false".
 CARDDAV_IMPORT_PHOTOS = os.getenv("CARDDAV_IMPORT_PHOTOS")
-
-# --- Debugging control for Python script ---
-# This script will now use the global 'DEBUG' environment variable.
-# Set to "true" to enable detailed DEBUG messages within the Python script. Default is "false".
-
 
 # LDAP server address (e.g., "ldap://localhost:389")
 LDAP_SERVER = os.getenv("LDAP_SERVER")
@@ -230,9 +226,21 @@ for book_url in address_book_urls:
             if not full_name:
                  full_name = "Unknown Contact"
 
-            # Fallback for surname if not extracted from N (e.g., if only FN was present)
-            if not surname and full_name and ' ' in full_name and full_name != "Unknown Contact":
-                surname = full_name.split()[-1] # This split is on full_name string, not n_obj directly
+            # Fallback for surname: Ensure it's never empty if full_name exists, to satisfy LDAP schema requirements.
+            # This is specifically to address objectClassViolation for 'sn' in inetOrgPerson.
+            if not surname and full_name:
+                # If the full_name is a multi-word string, take the last word as surname.
+                if ' ' in full_name and full_name != "Unknown Contact":
+                    surname = full_name.split()[-1].strip()
+                else:
+                    # If full_name is a single word or no clear surname can be extracted,
+                    # use the full_name itself as surname. This satisfies 'sn' requirement.
+                    surname = full_name.strip()
+
+            # Final check: If surname is STILL empty after all fallbacks, set a placeholder.
+            # This handles cases where full_name might also be empty or derived as empty.
+            if not surname:
+                surname = "N/A" # Placeholder for required 'sn' attribute
 
 
             # Extract Email addresses
@@ -323,7 +331,7 @@ for contact in all_parsed_contacts:
     attributes = {
         'objectClass': ['inetOrgPerson', 'top'], # Required object classes for a person entry
         'cn': contact['full_name'],
-        'sn': contact['surname']
+        'sn': contact['surname'] # 'surname' will now always have a value (or "N/A")
     }
 
     # Add givenName attribute ONLY if it has a non-empty value

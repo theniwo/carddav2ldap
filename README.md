@@ -213,13 +213,17 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] LOG_FILE=true
 - [X] Test Logging
 - [X] Added feature to control secret censoring
-- [X] fix: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
-- [X] fix: invalidAttributeSyntax-Fehler for givenName
-- [X] fix: DEBUG messages appear in python script only when DEBUG=true
+- [X] fix: :bug: ERROR: Failed to connect to LDAP server: automatic bind not successful - invalidDNSyntax
+- [X] fix: :bug: invalidAttributeSyntax-Fehler for givenName
+- [X] fix: :bug: DEBUG messages appear in python script only when DEBUG=true
+- [X] fix: :bug: invalidAttributeSyntax for sn
+- [X] fix: :bug: invalidAttributeSyntax for telephoneNumber
+- [X] fix: :bug: invalidAttributeSyntax for mail and others
 - [ ] censor contact information in log files
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup
 - [ ] shrink docker image
 - [ ] make setting up ldap structure automatic with variables
+- [ ] TZ
 - [ ] translate german comments to english
 - [ ] reformat readme and describe variables more clearly
