@@ -253,6 +253,7 @@ for book_url in address_book_urls:
             # --- Extract and categorize Telephone numbers ---
             # Store all cleaned phone numbers in separate lists based on type
             all_cleaned_phones = [] # For the general 'telephoneNumber' attribute
+            work_phones = [] # New list for work phones
             home_phones = []
             mobile_phones = []
             fax_numbers = []
@@ -268,6 +269,8 @@ for book_url in address_book_urls:
 
                     types = [t.upper() for t in getattr(tel_obj, 'type_param', [])]
 
+                    if 'WORK' in types:
+                        work_phones.append(cleaned_phone)
                     if 'FAX' in types:
                         fax_numbers.append(cleaned_phone)
                     if 'CELL' in types or 'MOBILE' in types:
@@ -348,6 +351,7 @@ for book_url in address_book_urls:
                 "given_name": given_name,
                 "emails": emails,
                 "all_phones": all_cleaned_phones, # General list of all phones
+                "work_phones": work_phones, # New: list for work phones
                 "home_phones": home_phones,
                 "mobile_phones": mobile_phones,
                 "fax_numbers": fax_numbers,
@@ -425,16 +429,19 @@ for contact in all_parsed_contacts:
         attributes['givenName'] = contact['given_name'].encode('utf-8') # Explicitly encode
 
     # Add various phone number attributes
-    # telephoneNumber (general) should take only the first available number if multi-valued is not supported.
-    if contact['all_phones']:
-        # If 'telephoneNumber' in your LDAP schema is single-valued, take only the first.
-        attributes['telephoneNumber'] = contact['all_phones'][0].encode('utf-8') # Explicitly encode
+    # Prioritize work phone for general telephoneNumber, fallback to all_phones
+    if contact['work_phones']:
+        attributes['telephoneNumber'] = contact['work_phones'][0].encode('utf-8')
+    elif contact['all_phones']:
+        attributes['telephoneNumber'] = contact['all_phones'][0].encode('utf-8')
+
+    # Add specific phone number types if they exist
     if contact['home_phones']:
-        attributes['homePhone'] = [p.encode('utf-8') for p in contact['home_phones']] # Explicitly encode list elements
+        attributes['homePhone'] = [p.encode('utf-8') for p in contact['home_phones']]
     if contact['mobile_phones']:
-        attributes['mobile'] = [p.encode('utf-8') for p in contact['mobile_phones']] # Explicitly encode list elements
+        attributes['mobile'] = [p.encode('utf-8') for p in contact['mobile_phones']]
     if contact['fax_numbers']:
-        attributes['facsimileTelephoneNumber'] = [p.encode('utf-8') for p in contact['fax_numbers']] # Explicitly encode list elements
+        attributes['facsimileTelephoneNumber'] = [p.encode('utf-8') for p in contact['fax_numbers']]
 
     # Add optional attributes if they exist
     if contact['emails']:
