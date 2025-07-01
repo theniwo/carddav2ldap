@@ -1,10 +1,23 @@
-# carddav2ldap
+# carddav2ldap 🐳 🚀
+---
 Fetch contact information via CardDav and present as ldap to phones like snom
+
+# 📦 Features
+---
+* Import data from carddav servers like baikal (tested) and nextcloud (untested)
+* Multiple adressbooks are supported
+* Automatically sync your contacts
+* Web-based interface for LDAP management (phpldapadmin).
+* Web-based provisioning for snom phones etc.
+
+# 🛠️ Getting Started
+---
 
 There are 3 containers:
 * ldap
 * sync
 * web
+* phpldapadmin
 
 **ldap** is your ldap directory server.
 
@@ -12,9 +25,10 @@ There are 3 containers:
 
 **web** is used for external provisioning templates. You can delete it if you don't need provisioning, but it helps to configure your phone with necessary information to fetch from ldap
 
-# Installation
+**phpldapadmin** is used for checking and altering the ldap directory via a webeinterface. (NOTICE: Since the sync process is unidirectional i.e. from carddav to ldap, changes will be overwritten! 💥 )
 
-## Prerequisits
+## ✅ Prerequisits
+---
 Enter credentials and URLs in `.env`.
 
 Variable names should be self explanatory.
@@ -43,13 +57,15 @@ CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive se
 WARNING_TIMEOUT_SECONDS (Timeout in seconds for warning screen that is displayed, when CENSOR_SECRETS_IN_LOGS is set to false. Default is 30 seconds.)
 ```
 
-## Build and start Containers
+## 🏗️ Build and start Containers
+---
 ```
 docker compose build
 docker compose up -d
 ```
 
-## Fill ldap with structure
+## 👷 Fill ldap with structure
+---
 At first the ldap directory is empty and only contains your base
 
 ```
@@ -63,7 +79,7 @@ No such object (32)
 Matched DN: dc=niwo,dc=home
 ```
 
-First we create our admin user
+### 🦧 First we create our admin user
 
 ```
 cat admin.ldif
@@ -130,7 +146,8 @@ Additionally you can test if the login credentials are working
 docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -x -D "cn=admin,dc=niwo,dc=home" -w [LDAP_PASSWORD] -b "ou=contacts,dc=niwo,dc=home" -LLL "(objectClass=*)"
 ```
 
-## Add user
+### 👶 Add user
+---
 Next we add users to read your ldap directory
 
 ```
@@ -188,7 +205,7 @@ root@host:# docker logs -f carddav2ldap_ldap_1
 Of course the phonebook should still be empty by now.
 
 
-### Let users edit the directory (optional)
+#### ❤️‍🔥 Let users edit the directory (optional)
 If you want to have your users write to the directory, use the following acl.ldif
 ```
 root@host:# cat acl.ldif
@@ -222,11 +239,11 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: invalidAttributeSyntax for mail and others
 - [X] feat: add and censor contact information in log files
 - [X] feat: saftey timeout to display warning message
-- [ ] add check if script is already running and mitigate stacking
 - [ ] test  UTF-8 encoding
 - [ ] test image handling
 - [ ] fetch all phone and fax numbers
-- [ ] fetch adress data and other fields like company etc
+- [X] fetch adress data and other fields like company etc
+- [ ] add check if script is already running and mitigate stacking
 - [ ] provide env_example
 - [ ] make cron string as a variable
 - [ ] Add snom xml setup
