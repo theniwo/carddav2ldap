@@ -64,6 +64,13 @@ if [[ "${DEBUG,,}" == "true" ]]; then
     fi
     echo "DEBUG: End of $ENV_FILE contents."
 fi
+# Check if CRON_SCHEDULE is set, otherwise use default value
+CRON_SCHEDULE=${CRON_SCHEDULE:-0 0 * * *}
+
+echo "CRON_SCHEDULE is set to: $CRON_SCHEDULE"
+
+# Add the cron job (redirects output to a log file)
+echo "$CRON_SCHEDULE python3 /app/sync_script.py >> /var/log/cron.log 2>&1" | crontab -
 
 # Make the environment file executable (though 'source' doesn't strictly require it)
 chmod +x "$ENV_FILE"

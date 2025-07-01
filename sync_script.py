@@ -8,13 +8,13 @@ import ldap3
 from ldap3.core.exceptions import LDAPEntryAlreadyExistsResult
 from requests.auth import HTTPBasicAuth
 import sys
-import urllib.parse
-import urllib3
+import urllib.parse # Import urllib.parse for robust URL concatenation
+import urllib3 # For suppressing InsecureRequestWarning
 import binascii # Import for Base64 decoding errors
 import base64   # Import for Base64 encoding/dekoding if needed for PHOTO field
 import re       # Import for regular expressions to clean phone numbers
 
-# --- Environment variable definitions (renamed for carddav2ldap project) ---
+# --- Environment variable definitions ---
 # CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
 # This URL should list all your address books as sub-collections.
 CARDDAV_BASE_DISCOVERY_URL = os.getenv("CARDDAV_BASE_DISCOVERY_URL")
@@ -35,6 +35,26 @@ LDAP_BASE_DN = os.getenv("LDAP_BASE_DN")
 LDAP_USER = os.getenv("LDAP_USER")
 # LDAP bind password
 LDAP_PASSWORD = os.getenv("LDAP_PASSWORD")
+
+# Whitelist/Blacklist environment variables for individual contacts
+CARDDAV_EMAIL_WHITELIST_DOMAINS = os.getenv("CARDDAV_EMAIL_WHITELIST_DOMAINS", "").split(',')
+CARDDAV_EMAIL_BLACKLIST_DOMAINS = os.getenv("CARDDAV_EMAIL_BLACKLIST_DOMAINS", "").split(',')
+CARDDAV_CATEGORY_WHITELIST = os.getenv("CARDDAV_CATEGORY_WHITELIST", "").split(',')
+CARDDAV_CATEGORY_BLACKLIST = os.getenv("CARDDAV_CATEGORY_BLACKLIST", "").split(',')
+
+# Whitelist/Blacklist environment variables for entire address books
+CARDDAV_ADDRESSBOOK_WHITELIST = os.getenv("CARDDAV_ADDRESSBOOK_WHITELIST", "").split(',')
+CARDDAV_ADDRESSBOOK_BLACKLIST = os.getenv("CARDDAV_ADDRESSBOOK_BLACKLIST", "").split(',')
+
+
+# Clean up whitelist/blacklist to remove empty strings from split() if env var is empty
+CARDDAV_EMAIL_WHITELIST_DOMAINS = [d.strip() for d in CARDDAV_EMAIL_WHITELIST_DOMAINS if d.strip()]
+CARDDAV_EMAIL_BLACKLIST_DOMAINS = [d.strip() for d in CARDDAV_EMAIL_BLACKLIST_DOMAINS if d.strip()]
+CARDDAV_CATEGORY_WHITELIST = [c.strip() for c in CARDDAV_CATEGORY_WHITELIST if c.strip()]
+CARDDAV_CATEGORY_BLACKLIST = [c.strip() for c in CARDDAV_CATEGORY_BLACKLIST if c.strip()]
+CARDDAV_ADDRESSBOOK_WHITELIST = [b.strip() for b in CARDDAV_ADDRESSBOOK_WHITELIST if b.strip()]
+CARDDAV_ADDRESSBOOK_BLACKLIST = [b.strip() for b in CARDDAV_ADDRESSBOOK_BLACKLIST if b.strip()]
+
 
 # --- Helper function to get environment variables or exit ---
 def get_env_or_exit(var_name):
@@ -73,16 +93,66 @@ debug_python_enabled = get_boolean_env("DEBUG", default=False)
 censor_secrets_in_logs_enabled = get_boolean_env("CENSOR_SECRETS_IN_LOGS", default=True)
 
 
-ldap_server_url = get_env_or_exit("LDAP_SERVER")
-ldap_user = get_env_or_exit("LDAP_USER")
+ldap_server_url = os.getenv("LDAP_SERVER")
+ldap_user = os.getenv("LDAP_USER")
 ldap_password = os.getenv("LDAP_PASSWORD") # Get password value as is for ldap3 bind
-ldap_base_dn = get_env_or_exit("LDAP_BASE_DN")
+ldap_base_dn = os.getenv("LDAP_BASE_DN")
 
 # Suppress InsecureRequestWarning if SSL verification is disabled
 if not ssl_verify:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 print("Starting contact synchronization from CardDAV to LDAP (Project carddav2ldap)...")
+
+# --- Filtering functions ---
+def is_email_whitelisted(email, whitelist_domains):
+    """Checks if an email's domain is in the whitelist."""
+    if not whitelist_domains: # If whitelist is empty, all emails are allowed
+        return True
+    if not email:
+        return False
+    domain = email.split('@')[-1]
+    return domain in whitelist_domains
+
+def is_email_blacklisted(email, blacklist_domains):
+    """Checks if an email's domain is in the blacklist."""
+    if not blacklist_domains: # If blacklist is empty, no emails are blocked
+        return False
+    if not email:
+        return False
+    domain = email.split('@')[-1]
+    return domain in blacklist_domains
+
+def is_category_whitelisted(categories, whitelist_categories):
+    """Checks if any of a contact's categories are in the whitelist."""
+    if not whitelist_categories: # If whitelist is empty, all categories are allowed
+        return True
+    if not categories:
+        return False
+    # Check if any of the contact's categories are in the whitelist
+    return any(cat in whitelist_categories for cat in categories)
+
+def is_category_blacklisted(categories, blacklist_categories):
+    """Checks if any of a contact's categories are in the blacklist."""
+    if not blacklist_categories: # If blacklist is empty, no categories are blocked
+        return False
+    if not categories:
+        return False
+    # Check if any of the contact's categories are in the blacklist
+    return any(cat in blacklist_categories for cat in categories)
+
+def is_addressbook_whitelisted(addressbook_name, whitelist_addressbooks):
+    """Checks if an address book's name is in the whitelist."""
+    if not whitelist_addressbooks: # If whitelist is empty, all address books are allowed
+        return True
+    return addressbook_name in whitelist_addressbooks
+
+def is_addressbook_blacklisted(addressbook_name, blacklist_addressbooks):
+    """Checks if an address book's name is in the blacklist."""
+    if not blacklist_addressbooks: # If blacklist is empty, no address books are blocked
+        return False
+    return addressbook_name in blacklist_addressbooks
+
 
 # --- 1. Discover all address book URLs from CardDAV server ---
 print(f"Discovering address books from: {carddav_base_discovery_url}")
@@ -91,7 +161,7 @@ discovery_headers = {
     "Content-Type": "application/xml; charset=UTF-8",
 }
 # XML body for PROPFIND request to discover collections and addressbooks
-discovery_body = """<?xml version="1.0" encoding="utf-8" ?>
+discovery_body = """<?xml version="10" encoding="utf-8" ?>
 <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
   <D:prop>
     <D:resourcetype/>
@@ -130,15 +200,40 @@ discovery_root = ET.fromstring(discovery_response.text)
 for response_elem in discovery_root.findall(".//d:response", discovery_ns):
     href_elem = response_elem.find(".//d:href", discovery_ns)
     resourcetype_elem = response_elem.find(".//d:resourcetype", discovery_ns)
+    displayname_elem = response_elem.find(".//d:displayname", discovery_ns) # Get displayname
 
     if href_elem is not None and resourcetype_elem is not None:
         # Check if the resourcetype contains <C:addressbook/>
         if resourcetype_elem.find(".//c:addressbook", discovery_ns) is not None:
             relative_url_path = href_elem.text.strip()
-
-            # Use urljoin with the full CARDDAV_BASE_DISCOVERY_URL as the base
-            # This correctly handles trailing slashes and absolute vs relative paths for concatenation.
             full_url = urllib.parse.urljoin(carddav_base_discovery_url, relative_url_path)
+
+            # Extract address book name from displayname or URL path
+            addressbook_name = displayname_elem.text.strip() if displayname_elem is not None else ""
+            if not addressbook_name:
+                # Fallback to extracting from URL if displayname is missing
+                # e.g., from "https://server/dav.php/addressbooks/user/my_addressbook/" -> "my_addressbook"
+                path_parts = [p for p in full_url.split('/') if p]
+                if path_parts:
+                    # Try to get the last part if it's not the domain or a common DAV endpoint
+                    if path_parts[-1] not in ["addressbooks", "dav.php", "user"]: # Added "user" to exclude common path segments
+                        addressbook_name = path_parts[-1]
+                    elif len(path_parts) > 1 and path_parts[-2] not in ["addressbooks", "dav.php", "user"]:
+                        addressbook_name = path_parts[-2] # e.g., for /user/
+                if not addressbook_name: # Final fallback if still no name
+                    addressbook_name = full_url # Use full URL as name if nothing else works
+
+            print(f"DEBUG: Discovered address book: '{addressbook_name}' at URL: '{full_url}'") # Added debug for clarity
+
+            # Apply address book filters
+            if CARDDAV_ADDRESSBOOK_WHITELIST:
+                if not is_addressbook_whitelisted(addressbook_name, CARDDAV_ADDRESSBOOK_WHITELIST):
+                    print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to not being in whitelist.")
+                    continue
+            if CARDDAV_ADDRESSBOOK_BLACKLIST:
+                if is_addressbook_blacklisted(addressbook_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
+                    print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to being in blacklist.")
+                    continue
 
             address_book_urls.append(full_url)
 
@@ -147,7 +242,28 @@ if not address_book_urls:
     # Attempt to use CARDDAV_BASE_DISCOVERY_URL itself as a single address book if no others found.
     # This covers cases where the discovery URL IS the the address book.
     print(f"Attempting to use {carddav_base_discovery_url} as a single address book.")
-    address_book_urls.append(carddav_base_discovery_url)
+
+    # Extract name for filtering the base URL itself if used as a fallback
+    base_url_name = urllib.parse.urlparse(carddav_base_discovery_url).path.strip('/').split('/')[-1]
+    if not base_url_name:
+        base_url_name = urllib.parse.urlparse(carddav_base_discovery_url).netloc # Fallback to domain if path is empty
+    if not base_url_name:
+        base_url_name = carddav_base_discovery_url # Use full URL as name if nothing else works
+
+    print(f"DEBUG: Attempting to filter base URL as address book: '{base_url_name}'") # Added debug for clarity
+
+    if CARDDAV_ADDRESSBOOK_WHITELIST:
+        if not is_addressbook_whitelisted(base_url_name, CARDDAV_ADDRESSBOOK_WHITELIST):
+            print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to not being in whitelist.")
+        else:
+            address_book_urls.append(carddav_base_discovery_url)
+    elif CARDDAV_ADDRESSBOOK_BLACKLIST:
+        if is_addressbook_blacklisted(base_url_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
+            print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to being in blacklist.")
+        else:
+            address_book_urls.append(carddav_base_discovery_url)
+    else: # If no whitelist or blacklist for address books, add the base URL
+        address_book_urls.append(carddav_base_discovery_url)
 
 
 print(f"Found {len(address_book_urls)} address book(s) to process.")
@@ -345,7 +461,7 @@ for book_url in address_book_urls:
                         jpeg_photo_data = None
 
 
-            all_parsed_contacts.append({
+            contact_data = {
                 "full_name": full_name,
                 "surname": surname,
                 "given_name": given_name,
@@ -363,7 +479,31 @@ for book_url in address_book_urls:
                 "job_title": job_title,           # New job title field
                 "categories": categories,         # New categories field
                 "jpeg_photo": jpeg_photo_data # Add photo data here
-            })
+            }
+
+            # --- Apply Whitelist/Blacklist Filters for individual contacts ---
+            # Filter by email domain
+            if CARDDAV_EMAIL_WHITELIST_DOMAINS:
+                if not any(is_email_whitelisted(email, CARDDAV_EMAIL_WHITELIST_DOMAINS) for email in contact_data['emails']):
+                    print(f"INFO: Skipping contact '{contact_data['full_name']}' due to email not in whitelist.")
+                    continue
+            if CARDDAV_EMAIL_BLACKLIST_DOMAINS:
+                if any(is_email_blacklisted(email, CARDDAV_EMAIL_BLACKLIST_DOMAINS) for email in contact_data['emails']):
+                    print(f"INFO: Skipping contact '{contact_data['full_name']}' due to email in blacklist.")
+                    continue
+
+            # Filter by category
+            if CARDDAV_CATEGORY_WHITELIST:
+                if not is_category_whitelisted(contact_data['categories'], CARDDAV_CATEGORY_WHITELIST):
+                    print(f"INFO: Skipping contact '{contact_data['full_name']}' due to category not in whitelist.")
+                    continue
+            if CARDDAV_CATEGORY_BLACKLIST:
+                if is_category_blacklisted(contact_data['categories'], CARDDAV_CATEGORY_BLACKLIST):
+                    print(f"INFO: Skipping contact '{contact_data['full_name']}' due to category in blacklist.")
+                    continue
+
+            all_parsed_contacts.append(contact_data)
+
         except binascii.Error as e:
             # Catch specific Base64 decoding errors during initial vCard parsing
             print(f"ERROR: Base64 decoding failed for vCard from {book_url}. Error: {e}. Problematic vCard blob starts: {vcard_blob[:200]}...")
@@ -523,7 +663,7 @@ for contact in all_parsed_contacts:
             if 'l' in display_attributes:
                 display_attributes['l'] = '[REDACTED_LOCALITY]'
             if 'postalCode' in display_attributes:
-                display_attributes['postalCode'] = ['[REDACTED_POSTAL_CODE]' for _ in display_attributes['postalCode']]
+                display_attributes['postalCode'] = '[REDACTED_POSTAL_CODE]' # Postal code can be single or multi-valued depending on schema
             # Censor organization and categories
             if 'o' in display_attributes:
                 display_attributes['o'] = '[REDACTED_ORG]'
@@ -548,19 +688,27 @@ for contact in all_parsed_contacts:
             # Prepare changes for modify operation
             changes = {}
             for attr_name, attr_value in attributes.items():
+                if attr_name in ['objectClass', 'cn', 'sn']: # These are typically not modified
+                    continue
+
+                # For multi-valued attributes, check if the value is a list
                 if isinstance(attr_value, list):
-                    # For multi-valued attributes, use the list directly for replacement
+                    # Replace existing values with the new list of values
                     changes[attr_name] = [(ldap3.MODIFY_REPLACE, attr_value)]
                 else:
                     # For single-valued attributes, wrap in a list for replacement
                     changes[attr_name] = [(ldap3.MODIFY_REPLACE, [attr_value])]
 
-            # Perform the modify operation
-            conn.modify(ldap_dn, changes)
-            if conn.result['description'] == 'success':
-                print(f"Updated contact: {contact['full_name']}")
+            # Perform the modify operation only if there are changes to apply
+            if changes:
+                conn.modify(ldap_dn, changes)
+                if conn.result['description'] == 'success':
+                    print(f"Updated contact: {contact['full_name']}")
+                else:
+                    print(f"WARNING: Failed to update contact {contact['full_name']}: {conn.result}")
             else:
-                print(f"WARNING: Failed to update contact {contact['full_name']}: {conn.result}")
+                print(f"INFO: No changes detected for contact {contact['full_name']}. Skipping update.")
+
         else:
             print(f"WARNING: Failed to add/update contact {contact['full_name']}: {conn.result}")
 
