@@ -64,13 +64,26 @@ if [[ "${DEBUG,,}" == "true" ]]; then
     fi
     echo "DEBUG: End of $ENV_FILE contents."
 fi
+
 # Check if CRON_SCHEDULE is set, otherwise use default value
 CRON_SCHEDULE=${CRON_SCHEDULE:-0 0 * * *}
 
 echo "CRON_SCHEDULE is set to: $CRON_SCHEDULE"
 
-# Add the cron job (redirects output to a log file)
-echo "$CRON_SCHEDULE python3 /app/sync_script.py >> /var/log/cron.log 2>&1" | crontab -
+# Create a temporary file for the crontab entries
+CRON_FILE=$(mktemp)
+
+# Add the @reboot job to run the script once on container start/reboot
+echo "@reboot python3 /app/sync_script.py >> /var/log/cron.log 2>&1" >> "$CRON_FILE"
+
+# Add the regularly scheduled cron job
+echo "$CRON_SCHEDULE python3 /app/sync_script.py >> /var/log/cron.log 2>&1" >> "$CRON_FILE"
+
+# Load the combined cron jobs into crontab
+crontab "$CRON_FILE"
+
+# Remove the temporary file
+rm "$CRON_FILE"
 
 # Make the environment file executable (though 'source' doesn't strictly require it)
 chmod +x "$ENV_FILE"
