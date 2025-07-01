@@ -1,0 +1,26 @@
+# LDAP Server
+LDAP_ORGANISATION=example
+LDAP_DOMAIN=example.com
+
+# Sync configuration
+LDAP_BASE_DN="ou=contacts,dc=example,dc=com"
+LDAP_USER="cn=admin,dc=example,dc=com"
+LDAP_PASSWORD=password
+CRON_SCHEDULE=*/5 * * * *
+# Logging (optional)
+#DEBUG=true
+#LOG_FILE=true
+#CENSOR_SECRETS_IN_LOGS=true
+#WARNING_TIMEOUT_SECONDS=10
+
+# CARDDAV Server
+CARDDAV_USERNAME=user
+CARDDAV_PASSWORD=password
+CARDDAV_SSL_VERIFY=true
+CARDDAV_BASE_DISCOVERY_URL=https://calendar.example.com/dav.php/addressbooks/${CARDDAV_USERNAME}/
+CARDDAV_IMPORT_PHOTOS=false
+
+# phpLDAPadmin Configuration
+LDAP_HOST=ldap
+HTTPS=false
+ADMIN_PORT=8081
