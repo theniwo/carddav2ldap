@@ -73,11 +73,14 @@ echo "CRON_SCHEDULE is set to: $CRON_SCHEDULE"
 # Create a temporary file for the crontab entries
 CRON_FILE=$(mktemp)
 
+# Command to run
+COMMAND="/bin/bash -c /app/sync_script.sh >> /proc/1/fd/1 2>&1"
+
 # Add the @reboot job to run the script once on container start/reboot
-echo "@reboot python3 /app/sync_script.py >> /var/log/cron.log 2>&1" >> "$CRON_FILE"
+echo "@reboot $COMMAND" >> "$CRON_FILE"
 
 # Add the regularly scheduled cron job
-echo "$CRON_SCHEDULE python3 /app/sync_script.py >> /var/log/cron.log 2>&1" >> "$CRON_FILE"
+echo "$CRON_SCHEDULE $COMMAND" >> "$CRON_FILE"
 
 # Load the combined cron jobs into crontab
 crontab "$CRON_FILE"
