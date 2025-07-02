@@ -24,17 +24,17 @@ if [[ -n "${CENSOR_SECRETS_IN_LOGS}" && "${CENSOR_SECRETS_IN_LOGS,,}" == "false"
     CENSOR_SECRETS_IN_LOGS_ENABLED=false
 fi
 
-# --- Logging Einstellungen ---
-# Dies ist der Standard-Pfad, wenn LOG_FILE nicht gesetzt ist oder ungültig ist.
+# --- Logging Settings ---
+# This is the default path if LOG_FILE is not set or invalid.
 DEFAULT_FILE_LOG_PATH="/var/log/carddav2ldap/sync_output.log"
-# Dies wird der tatsächliche Pfad sein, in den tee schreibt.
+# This will be the actual path where tee writes.
 ACTIVE_FILE_LOG_PATH=""
 
-# Bestimmen, ob das Logging in eine Datei aktiv sein soll und setzen Sie den Pfad.
-# Logik:
-# 1. Wenn LOG_FILE leer oder "false", logging deaktivieren (/dev/null).
-# 2. Wenn LOG_FILE "true", Standardpfad nutzen.
-# 3. Sonst (benutzerdefinierter Pfad), den Wert von LOG_FILE nutzen.
+# Determine if file logging should be active and set the path.
+# Logic:
+# 1. If LOG_FILE is empty or "false", disable logging (/dev/null).
+# 2. If LOG_FILE is "true", use the default path.
+# 3. Otherwise (custom path), use the value of LOG_FILE.
 if [[ "${LOG_FILE,,}" == "false" || -z "${LOG_FILE}" ]]; then
     # File logging disabled (LOG_FILE not set or set to 'False'/'false').
     echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')." | tee /dev/stdout
@@ -52,36 +52,36 @@ else
 fi
 
 
-# Diese Funktion leitet ihre Eingabe über `tee` weiter.
-# Sie stellt sicher, dass die Ausgabe immer an stdout (für Docker-Logs) geht
-# und optional an die angegebene Log-Datei.
+# This function pipes its input via `tee`.
+# It ensures that output always goes to stdout (for Docker logs)
+# and optionally to the specified log file.
 log_and_tee() {
-    # `cat` ist nötig, da tee Eingabe von stdin erwartet.
-    # `tee -a` schreibt in die tatsächliche Log-Datei (oder /dev/null, wenn deaktiviert).
-    # Die Ausgabe von `tee` (sein eigener stdout) wird dann vom Haupt-Cronjob-Redirect erfasst.
+    # `cat` is needed because tee expects input from stdin.
+    # `tee -a` writes to the actual log file (or /dev/null if disabled).
+    # The output of `tee` (its own stdout) is then captured by the main cron job redirect.
     cat | tee -a "$ACTIVE_FILE_LOG_PATH"
 }
 
-# Verwenden Sie nun diese Funktion, um alle Befehlsausgaben zu wrappen, die Sie loggen möchten.
+# Use this function now to wrap all command outputs you want to log.
 echo "$(date): Starting carddav2ldap synchronization script..." | log_and_tee
 
-# --- DEBUGGING-SCHRITT (NUR ins File-Log, NICHT Docker-Logs) ---
-# Diese Ausgaben werden nur in die Log-Datei geschrieben, um die Docker-Logs sauber zu halten.
-# Nur ausführen, wenn DEBUG explizit auf 'true' gesetzt ist UND Dateil-Logging aktiv ist.
+# --- DEBUGGING STEP (ONLY to file log, NOT Docker logs) ---
+# These outputs are only written to the log file to keep Docker logs clean.
+# Only execute if DEBUG is explicitly set to 'true' AND file logging is active.
 if [[ "${DEBUG,,}" == "true" && "$ACTIVE_FILE_LOG_PATH" != "/dev/null" ]]; then
     echo "$(date): --- Environment variables at script start (after sourcing) ---" >> "$ACTIVE_FILE_LOG_PATH"
     # Censor sensitive environment variables if enabled
     if [[ "$CENSOR_SECRETS_IN_LOGS_ENABLED" == "true" ]]; then
         env | sed -E 's/^(LDAP_PASSWORD|CARDDAV_PASSWORD)=.*/\1=[REDACTED]/g' >> "$ACTIVE_FILE_LOG_PATH"
     else
-        env >> "$ACTIVE_FILE_LOG_PATH" # Leiten Sie die Ausgabe von 'env' direkt in die Log-Datei
+        env >> "$ACTIVE_FILE_LOG_PATH" # Redirect 'env' output directly to the log file
     fi
     echo "$(date): ----------------------------------------------------" >> "$ACTIVE_FILE_LOG_PATH"
 fi
-# --- ENDE DEBUGGING-SCHRITT ---
+# --- END DEBUGGING STEP ---
 
-# Führen Sie das Python-Skript aus. Seine stdout/stderr wird durch log_and_tee geleitet.
-# Hinweis: 2>&1 muss VOR der Pipe stehen, sonst wird nur stdout geleitet.
+# Execute the Python script. Its stdout/stderr will be piped through log_and_tee.
+# Note: 2>&1 must come BEFORE the pipe, otherwise only stdout is piped.
 /usr/local/bin/python /app/sync_script.py 2>&1 | log_and_tee
 
 echo "$(date): CardDAV to LDAP synchronization script finished." | log_and_tee
