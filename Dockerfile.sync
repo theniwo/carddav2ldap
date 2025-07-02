@@ -1,16 +1,16 @@
-# Verwende ein Python-Image als Basis
+# Use a Python image as base
 FROM python:3.9-slim
 
-# Arbeitsverzeichnis erstellen
+# Create working directory
 WORKDIR /app
 
-# Setze Standardwerte für Umgebungsvariablen
+# Set default values for environment variables
 ENV \
     LDAP_SERVER="ldap://ldap:389" \
     CARDDAV_SSL_VERIFY="true" \
     LOG_FILE="/var/log/carddav2ldap/sync_output.log"
 
-# Abhängigkeiten für den Build installieren
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libsasl2-dev \
@@ -19,37 +19,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Abhängigkeiten installieren
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Cron
-# Cronjob hinzufügen
-COPY crontab /etc/cron.d/ldap-sync-cron
-
-# Berechtigungen für den Cronjob setzen
-RUN chmod 0644 /etc/cron.d/ldap-sync-cron \
-    && touch /etc/cron.d/ldap-sync-cron
-
-# Cronjob aktivieren
-RUN crontab /etc/cron.d/ldap-sync-cron
-
-# Cleanup
+# Remove requirements.txt after installation
 RUN rm requirements.txt -rf
+# Optional cleanup: remove build dependencies (uncomment if needed)
 #RUN rm requirements.txt -rf && apt-get remove -y $(dpkg -l | grep ^ii| awk '{print $2 " "}' | cut -d: -f1 | grep -e gcc -e dev$ | grep -ve libgcc -e base | awk '{printf $1 " "}') && apt-get autoremove -y
 
-# Skripte kopieren
+# Copy scripts
 COPY sync_script.sh .
 COPY sync_script.py .
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Skript ausführbar machen
+# Make scripts executable
 RUN chmod +x /app/sync_script.sh
 RUN chmod +x /app/sync_script.py
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Tini als Init-System verwenden, um Zombie-Prozesse zu vermeiden und Signale korrekt zu handhaben
+# Use Tini as init system to avoid zombie processes and handle signals correctly
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
-# Starten von Cron und dem Skript
+# Start cron daemon
 CMD ["cron", "-f"]
 
