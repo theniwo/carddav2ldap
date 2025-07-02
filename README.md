@@ -55,6 +55,7 @@ LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a pat
 DEBUG (Turns on debug logging.)
 CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive secrets like LDAP_PASSWORD and CARDDAV_PASSWORD and sensitive ldap fields like telephoneNumber etc to stdout AND LOG_FILE (if enabled!))
 WARNING_TIMEOUT_SECONDS (Timeout in seconds for warning screen that is displayed, when CENSOR_SECRETS_IN_LOGS is set to false. Default is 30 seconds.)
+
 ```
 
 ## 🏗️ Build and start Containers
@@ -239,9 +240,10 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: invalidAttributeSyntax for mail and others
 - [X] feat: add and censor contact information in log files
 - [X] feat: saftey timeout to display warning message
+- [ ] fetch all phone and fax numbers
+- [ ] Blacklist for Adressbooks and/or contacts
 - [ ] test  UTF-8 encoding
 - [ ] test image handling
-- [ ] fetch all phone and fax numbers
 - [X] fetch adress data and other fields like company etc
 - [ ] add check if script is already running and mitigate stacking
 - [ ] provide env_example
@@ -251,4 +253,4 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [ ] make setting up ldap structure automatic with variables
 - [ ] TZ
 - [ ] translate german comments to english
-- [ ] reformat readme and describe variables more clearly
+- [ ] reformat readme and describe variables more clearly as well as seperate variables for services
