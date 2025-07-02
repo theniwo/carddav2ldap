@@ -1,0 +1,24 @@
+# Dockerfile.ldap
+# This Dockerfile builds a custom OpenLDAP image with embedded schema files and initial LDIFs.
+
+# Use the official osixia/openldap image as base
+FROM osixia/openldap:latest
+
+# Set the working directory (optional, but good practice)
+WORKDIR /app
+
+# Copy the custom schema files into the image
+# These files should be placed in a directory named 'ldap_schemas' relative to this Dockerfile.
+# Ensure these are the *corrected* schema files (uncommented lines, no SINGLE-VALUE for multi-valued attributes).
+COPY ./ldap_schemas/core.ldif /etc/ldap/schema/core.ldif
+COPY ./ldap_schemas/cosine.ldif /etc/ldap/schema/cosine.ldif
+COPY ./ldap_schemas/inetorgperson.ldif /etc/ldap/schema/inetorgperson.ldif
+
+# Copy the initial LDIF files into the image
+# These files will be loaded by the osixia/openldap container on first setup.
+# Ensure these are placed in a directory named 'ldap_init_config' relative to this Dockerfile.
+COPY ./ldap_init_config/ /container/service/slapd/assets/config/bootstrap/ldif/custom/
+
+# The base image's entrypoint will handle the LDAP server startup and configuration.
+# No CMD or ENTRYPOINT needed here, as the base image provides it.
+
