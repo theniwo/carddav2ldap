@@ -19,12 +19,15 @@ COPY ./ldap_schemas/inetorgperson.ldif /etc/ldap/schema/inetorgperson.ldif
 # Ensure these are placed in a directory named 'ldap_init_config' relative to this Dockerfile.
 COPY ./ldap_init_config/ /container/service/slapd/assets/config/bootstrap/ldif/custom/
 
-# IMPORTANT: Explicitly clean the slapd.d directory before the container starts.
-# This is a workaround for cases where the ldap_config volume might not be truly empty
-# or the container's internal cleanup logic doesn't trigger as expected.
-# This ensures a fresh configuration setup when LDAP_INIT_CONFIG=true is used.
-RUN rm -rf /etc/ldap/slapd.d/*
+# Copy the custom LDAP entrypoint script and make it executable
+# This script will handle the explicit cleanup of the config directory at runtime.
+COPY ldap-entrypoint.sh /usr/local/bin/ldap-entrypoint.sh
+RUN chmod +x /usr/local/bin/ldap-entrypoint.sh
 
-# The base image's entrypoint will handle the LDAP server startup and configuration.
-# No CMD or ENTRYPOINT needed here, as the base image provides it.
+# Set the custom entrypoint for the container.
+# This ensures our cleanup logic runs before the original osixia/openldap entrypoint.
+ENTRYPOINT ["/usr/local/bin/ldap-entrypoint.sh"]
+
+# The base image's CMD will be passed as arguments to our new entrypoint.
+# No CMD needed here, as the base image provides it.
 
