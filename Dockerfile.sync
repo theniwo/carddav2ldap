@@ -23,9 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Remove requirements.txt after installation
+# Cleanup
 RUN rm requirements.txt -rf
-# Optional cleanup: remove build dependencies (uncomment if needed)
 #RUN rm requirements.txt -rf && apt-get remove -y $(dpkg -l | grep ^ii| awk '{print $2 " "}' | cut -d: -f1 | grep -e gcc -e dev$ | grep -ve libgcc -e base | awk '{printf $1 " "}') && apt-get autoremove -y
 
 # Copy scripts
