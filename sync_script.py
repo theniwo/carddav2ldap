@@ -161,7 +161,7 @@ discovery_headers = {
     "Content-Type": "application/xml; charset=UTF-8",
 }
 # XML body for PROPFIND request to discover collections and addressbooks
-discovery_body = """<?xml version="10" encoding="utf-8" ?>
+discovery_body = """<?xml version="1.0" encoding="utf-8" ?>
 <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
   <D:prop>
     <D:resourcetype/>
