@@ -1,4 +1,3 @@
----
 volumes:
   ldap_data:
   ldap_config:
@@ -8,20 +7,26 @@ volumes:
 
 services:
   ldap:
-    image: osixia/openldap
+    # Use the custom-built image instead of the public one
+    build:
+      context: .
+      dockerfile: Dockerfile.ldap # Specify the new Dockerfile for LDAP
+    #image: osixia/openldap # This line is commented out as we are building a custom image
     restart: unless-stopped
     env_file:
       - ./.env
     environment:
       # LDAP base DN configuration
       - LDAP_ORGANISATION=${LDAP_ORGANISATION:-example}
-      - LDAP_DOMAIN=${LDAP_DOMAIN:-local}
+      - LDAP_DOMAIN=${LDAP_DOMAIN:-com}
       # Admin user configuration (password from .env file)
-      - LDAP_ADMIN_PASSWORD=${LDAP_ADMIN_PASSWORD}
-      # Forces re-initialization of the configuration on startup,
-      # if the ldap_config volume is empty.
+      - LDAP_PASSWORD=${LDAP_PASSWORD}
+      # Forces re-initialization of the configuration on startup.
+      # IMPORTANT: Set to 'true' to ensure schema and initial LDIF changes are applied
+      # after a 'docker-compose down -v' and 'docker-compose up'.
       - LDAP_REMOVE_CONFIG_AFTER_SETUP=true
-      # Optional: TLS setup (uncomment and adjust paths if TLS is needed)
+      # Explicitly disable TLS setup to prevent errors if not configured
+      - LDAP_TLS=false
       # - LDAP_TLS_CRT_FILENAME=your.crt
       # - LDAP_TLS_KEY_FILENAME=your.key
       # - LDAP_TLS_CA_CRT_FILENAME=your_ca.crt
@@ -31,11 +36,8 @@ services:
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
-      # Mount the corrected schema files to override the default schemas
-      - ./ldap_schemas/core.ldif:/etc/ldap/schema/core.ldif:ro
-      - ./ldap_schemas/cosine.ldif:/etc/ldap/schema/cosine.ldif:ro
-      - ./ldap_schemas/inetorgperson.ldif:/etc/ldap/schema/inetorgperson.ldif:ro
       # Mount the directory with initialization LDIFs (e.g., for OUs)
+      # Mounted as read-only to prevent permission errors during container startup.
       - ./ldap_init_config:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
     healthcheck:
       test: ["CMD", "ldapwhoami", "-x", "-H", "ldap://localhost"]
@@ -44,10 +46,14 @@ services:
       retries: 10
 
   sync:
-    build: .
-    depends_on:
-      - ldap
+    build:
+      context: .
+      dockerfile: Dockerfile.sync # Specify the Dockerfile for the sync service
+    # Defines the entrypoint for the cron job
+    entrypoint: /usr/local/bin/docker-entrypoint.sh
     restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
       # CardDAV Configuration
       - CARDDAV_BASE_DISCOVERY_URL=${CARDDAV_BASE_DISCOVERY_URL}
@@ -57,24 +63,23 @@ services:
       - CARDDAV_IMPORT_PHOTOS=${CARDDAV_IMPORT_PHOTOS:-false}
       # LDAP Configuration
       - LDAP_SERVER=${LDAP_SERVER:-ldap://ldap:389} # Uses the service name 'ldap'
-      - LDAP_BASE_DN=${LDAP_BASE_DN:-ou=contacts,dc=example,dc=com}
-      - LDAP_USER=${LDAP_USER:-cn=admin,dc=example,dc=com}
-      - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD} # Uses the admin password for the sync user
+      - LDAP_BASE_DN=${LDAP_BASE_DN:-ou=contacts,dc=example,dc=com} # Aligned with LDAP service defaults
+      - LDAP_USER=${LDAP_USER:-cn=admin,dc=example,dc=com} # Aligned with LDAP service defaults
+      - LDAP_PASSWORD=${LDAP_PASSWORD} # Uses the admin password for the sync user
       # Debug Settings
       - DEBUG=${DEBUG:-false}
       - CENSOR_SECRETS_IN_LOGS=${CENSOR_SECRETS_IN_LOGS:-true}
       # Cron Job Timer as Variable
       - CRON_SCHEDULE=${CRON_SCHEDULE:-*/30 * * * *} # Default: every 30 minutes
-      # Whitelist/Blacklist Variables (examples, can be adjusted)
+      # Whitelist/Blacklist Variables for individual contacts
       - CARDDAV_EMAIL_WHITELIST_DOMAINS=${CARDDAV_EMAIL_WHITELIST_DOMAINS:-} # Comma-separated: example.com,test.org
       - CARDDAV_EMAIL_BLACKLIST_DOMAINS=${CARDDAV_EMAIL_BLACKLIST_DOMAINS:-} # Comma-separated: spam.com,bad.net
+      # Whitelist/Blacklist Variables for categories
       - CARDDAV_CATEGORY_WHITELIST=${CARDDAV_CATEGORY_WHITELIST:-} # Comma-separated: Family,Friends
       - CARDDAV_CATEGORY_BLACKLIST=${CARDDAV_CATEGORY_BLACKLIST:-} # Comma-separated: Spam,Blocked
       # Whitelist/Blacklist Variables for entire address books
       - CARDDAV_ADDRESSBOOK_WHITELIST=${CARDDAV_ADDRESSBOOK_WHITELIST:-} # Comma-separated: personal,work
       - CARDDAV_ADDRESSBOOK_BLACKLIST=${CARDDAV_ADDRESSBOOK_BLACKLIST:-} # Comma-separated: archived,spam
-    env_file:
-      - ./.env
     volumes:
       - sync_log:/var/log/carddav2ldap
     # Ensures that the LDAP service is running before the sync service starts
@@ -94,9 +99,11 @@ services:
   phpldapadmin:
     image: osixia/phpldapadmin
     environment:
-      PHPLDAPADMIN_LDAP_HOSTS: ${LDAP_HOST}
-      PHPLDAPADMIN_HTTPS: ${HTTPS}
+      PHPLDAPADMIN_LDAP_HOSTS: ${LDAP_HOST:-ldap} # Use LDAP_HOST variable from .env, default to the service name 'ldap' for host
+      PHPLDAPADMIN_HTTPS: ${HTTPS:-false} # Use HTTPS variable from .env, default to false
     ports:
-      - "${ADMIN_PORT}:80"
+      - "${ADMIN_PORT:-8081}:80" # Map ADMIN_PORT from .env, default to 8081
     depends_on:
-      - ldap
+      ldap:
+        condition: service_healthy
+
