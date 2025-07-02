@@ -19,6 +19,12 @@ COPY ./ldap_schemas/inetorgperson.ldif /etc/ldap/schema/inetorgperson.ldif
 # Ensure these are placed in a directory named 'ldap_init_config' relative to this Dockerfile.
 COPY ./ldap_init_config/ /container/service/slapd/assets/config/bootstrap/ldif/custom/
 
+# IMPORTANT: Explicitly clean the slapd.d directory before the container starts.
+# This is a workaround for cases where the ldap_config volume might not be truly empty
+# or the container's internal cleanup logic doesn't trigger as expected.
+# This ensures a fresh configuration setup when LDAP_INIT_CONFIG=true is used.
+RUN rm -rf /etc/ldap/slapd.d/*
+
 # The base image's entrypoint will handle the LDAP server startup and configuration.
 # No CMD or ENTRYPOINT needed here, as the base image provides it.
 
