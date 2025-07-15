@@ -21,6 +21,8 @@ services:
       - LDAP_DOMAIN=${LDAP_DOMAIN:-example.com}
       # Admin user configuration (password from .env file)
       - LDAP_PASSWORD=${LDAP_PASSWORD}
+      # Password for the cn=admin,cn=config user (for configuration database access)
+      - LDAP_CONFIG_PASSWORD=${LDAP_CONFIG_PASSWORD} # NEW: Added for config admin access
       # Forces re-initialization of the configuration on startup.
       # IMPORTANT: Set to 'true' to ensure schema and initial LDIF changes are applied
       # after a 'docker-compose down -v' and 'docker-compose up'.
