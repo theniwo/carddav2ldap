@@ -695,7 +695,7 @@ for contact in all_parsed_contacts:
         
         print(f"DEBUG: Parsed contact data (before LDAP operation): {contact}") # Added for troubleshooting
         print(f"DEBUG: Constructed LDAP DN: '{ldap_dn}'") # NEW: Print the final DN
-        print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {display_attributes}")
+        print(f"DEBUG: LDAP attributes to add/modify: {display_attributes}") # NEW: Print attributes before LDAP call
         sys.stdout.flush() # Flush print statement immediately
 
     try:
