@@ -1,26 +1,41 @@
-# LDAP Server
-LDAP_ORGANISATION=example
-LDAP_DOMAIN=example.com
+# To configure your carddav2ldap setup, create a .env file in the same directory as your docker-compose.yml. This file will hold all your environment variables.# .env-Datei
 
-# Sync configuration
-LDAP_BASE_DN="ou=contacts,dc=example,dc=com"
-LDAP_USER="cn=admin,dc=example,dc=com"
-LDAP_PASSWORD=password
-CRON_SCHEDULE=*/5 * * * *
-# Logging (optional)
-#DEBUG=true
-#LOG_FILE=true
-#CENSOR_SECRETS_IN_LOGS=true
-#WARNING_TIMEOUT_SECONDS=10
+# CardDAV Configuration
+CARDDAV_BASE_DISCOVERY_URL=https://your.carddav.server/dav.php/addressbooks/user/
+CARDDAV_USERNAME=your_carddav_username
+CARDDAV_PASSWORD=your_carddav_password
+CARDDAV_SSL_VERIFY=true # Set to false if you want to ignore SSL errors (not recommended for production)
+CARDDAV_IMPORT_PHOTOS=false # Set to true to import photos
 
-# CARDDAV Server
-CARDDAV_USERNAME=user
-CARDDAV_PASSWORD=password
-CARDDAV_SSL_VERIFY=true
-CARDDAV_BASE_DISCOVERY_URL=https://calendar.example.com/dav.php/addressbooks/${CARDDAV_USERNAME}/
-CARDDAV_IMPORT_PHOTOS=false
+# LDAP Admin Password (used for the LDAP service and the sync user)
+LDAP_PASSWORD=your_secure_ldap_admin_password
+# LDAP Organization and Domain (defaults to niwo.home if not set)
+LDAP_ORGANISATION=niwo
+LDAP_DOMAIN=niwo.home # Corrected to niwo.home for dc=niwo,dc=home
+
+# Password for the cn=admin,cn=config user (for configuration database access)
+LDAP_CONFIG_PASSWORD=your_secure_config_admin_password # NEW: Set a strong password here!
+
+# Debug Settings for Python script logs
+DEBUG=true
+CENSOR_SECRETS_IN_LOGS=false
+
+# Cron Job Schedule (e.g., "*/5 * * * *" for every 5 minutes, "0 0 * * *" for daily at midnight)
+CRON_SCHEDULE=*/30 * * * * # Default: every 30 minutes
+
+# Whitelist/Blacklist Settings for individual contacts (comma-separated, leave empty for no filtering)
+CARDDAV_EMAIL_WHITELIST_DOMAINS=
+CARDDAV_EMAIL_BLACKLIST_DOMAINS=
+CARDDAV_CATEGORY_WHITELIST=
+CARDDAV_CATEGORY_BLACKLIST=
+
+# Whitelist/Blacklist Settings for entire address books (comma-separated, leave empty for no filtering)
+# If CARDDAV_ADDRESSBOOK_WHITELIST is set, only listed address books will be processed.
+# If CARDDAV_ADDRESSBOOK_WHITELIST is empty, CARDDAV_ADDRESSBOOK_BLACKLIST will be checked.
+CARDDAV_ADDRESSBOOK_WHITELIST=
+CARDDAV_ADDRESSBOOK_BLACKLIST=
 
 # phpLDAPadmin Configuration
-LDAP_HOST=ldap
-HTTPS=false
-ADMIN_PORT=8081
+ADMIN_PORT=8081 # Port for phpLDAPadmin (e.g., 8081)
+HTTPS=false # Set to true if phpLDAPadmin should use HTTPS (requires further setup)
+
