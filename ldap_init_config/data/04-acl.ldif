@@ -1,0 +1,29 @@
+# 04-acl.ldif
+# This LDIF sets the correct ACLs for your LDAP server.
+# It ensures that 'phone' and 'printer' users have read access ONLY on contacts,
+# and anonymous access to contacts is denied.
+
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+# Remove all existing olcAccess rules to start clean
+delete: olcAccess
+-
+# Add the specific ACL for the ou=contacts subtree (index {0})
+# - Grants read to 'printer' and 'phone' users
+# - Grants read to any other authenticated user ('by users read')
+# - Denies all access to anonymous users ('by anonymous none') for this subtree
+add: olcAccess
+olcAccess: {0}to dn.subtree="ou=contacts,dc=niwo,dc=home" \
+  by dn.exact="cn=printer,ou=contacts,dc=niwo,dc=home" read \
+  by dn.exact="cn=phone,ou=contacts,dc=niwo,dc=home" read \
+  by users read \
+  by anonymous none
+-
+# Add a general fallback ACL for the entire directory (index {1})
+# - Allows users to write to their own entry ('by self write')
+# - Grants read to any authenticated user ('by users read')
+# - Allows anonymous users to authenticate (bind) but not read ('by anonymous auth')
+# - Denies all access to everyone else ('by * none')
+add: olcAccess
+olcAccess: {1}to * by self write by users read by anonymous auth by * none
+
