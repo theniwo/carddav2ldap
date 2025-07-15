@@ -10,9 +10,9 @@ WORKDIR /app
 # Copy the custom schema files into the image
 # These files should be placed in a directory named 'ldap_schemas' relative to this Dockerfile.
 # Ensure these are the *corrected* schema files (uncommented lines, no SINGLE-VALUE for multi-valued attributes).
-COPY ./ldap_init_config/schemas/core.ldif /etc/ldap/schema
-COPY ./ldap_init_config/schemas/cosine.ldif /etc/ldap/schema
-COPY ./ldap_init_config/schemas/inetorgperson.ldif /etc/ldap/schema
+#COPY ./ldap_init_config/schemas/core.ldif /etc/ldap/schema
+#COPY ./ldap_init_config/schemas/cosine.ldif /etc/ldap/schema
+#COPY ./ldap_init_config/schemas/inetorgperson.ldif /etc/ldap/schema
 #COPY ./ldap_schemas/core.ldif /etc/ldap/schema/core.ldif
 #COPY ./ldap_schemas/cosine.ldif /etc/ldap/schema/cosine.ldif
 #COPY ./ldap_schemas/inetorgperson.ldif /etc/ldap/schema/inetorgperson.ldif
