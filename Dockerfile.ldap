@@ -1,33 +1,16 @@
-# Dockerfile.ldap
-# This Dockerfile builds a custom OpenLDAP image with embedded schema files and initial LDIFs.
+# Dockerfile for the LDAP service
+FROM osixia/openldap:1.5.0 # Base on the osixia/openldap image
 
-# Use the official osixia/openldap image as base
-FROM osixia/openldap:latest
+# Copy custom schema files into the container (REMOVED: This line is no longer needed for standard schemas)
+# COPY ./ldap_init_config/schema/ /container/service/slapd/assets/config/bootstrap/ldif/custom/schema/
 
-# Set the working directory (optional, but good practice)
-WORKDIR /app
+# Copy the initial data LDIFs (e.g., for OUs like 'contacts')
+# This is still needed for your custom OUs and initial data.
+COPY ./ldap_init_config/data/ /container/service/slapd/assets/config/bootstrap/ldif/custom/data/
 
-# Copy the custom schema files into the image
-# These files should be placed in a directory named 'ldap_schemas' relative to this Dockerfile.
-# Ensure these are the *corrected* schema files (uncommented lines, no SINGLE-VALUE for multi-valued attributes).
-COPY ./ldap_schemas/core.ldif /etc/ldap/schema/core.ldif
-COPY ./ldap_schemas/cosine.ldif /etc/ldap/schema/cosine.ldif
-COPY ./ldap_schemas/inetorgperson.ldif /etc/ldap/schema/inetorgperson.ldif
+# Expose LDAP ports (already exposed by base image, but good practice to list)
+EXPOSE 389 636
 
-# Copy the initial LDIF files into the image
-# These files will be loaded by the osixia/openldap container on first setup.
-# Ensure these are placed in a directory named 'ldap_init_config' relative to this Dockerfile.
-COPY ./ldap_init_config/ /container/service/slapd/assets/config/bootstrap/ldif/custom/
-
-# Copy the custom LDAP entrypoint script and make it executable
-# This script will handle the explicit cleanup of the config directory at runtime.
-COPY ldap-entrypoint.sh /usr/local/bin/ldap-entrypoint.sh
-RUN chmod +x /usr/local/bin/ldap-entrypoint.sh
-
-# Set the custom entrypoint for the container.
-# This ensures our cleanup logic runs before the original osixia/openldap entrypoint.
-ENTRYPOINT ["/usr/local/bin/ldap-entrypoint.sh"]
-
-# The base image's CMD will be passed as arguments to our new entrypoint.
-# No CMD needed here, as the base image provides it.
+# Default command (inherited from base image)
+CMD ["/container/tool/run"]
 
