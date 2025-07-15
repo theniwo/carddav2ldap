@@ -18,7 +18,7 @@ services:
     environment:
       # LDAP base DN configuration
       - LDAP_ORGANISATION=${LDAP_ORGANISATION:-example}
-      - LDAP_DOMAIN=${LDAP_DOMAIN:-com}
+      - LDAP_DOMAIN=${LDAP_DOMAIN:-example.com}
       # Admin user configuration (password from .env file)
       - LDAP_PASSWORD=${LDAP_PASSWORD}
       # Forces re-initialization of the configuration on startup.
