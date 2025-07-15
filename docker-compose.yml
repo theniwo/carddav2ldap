@@ -1,5 +1,3 @@
-version: '3.8'
-
 volumes:
   ldap_data:
   ldap_config:
@@ -10,10 +8,10 @@ volumes:
 services:
   ldap:
     # Use the custom-built image instead of the public one
-    build:
-      context: .
-      dockerfile: Dockerfile.ldap # Specify the new Dockerfile for LDAP
-    #image: osixia/openldap # This line is commented out as we are building a custom image
+    #build:
+      #context: .
+      #dockerfile: Dockerfile.ldap # Specify the new Dockerfile for LDAP
+    image: osixia/openldap # This line is commented out as we are building a custom image
     restart: unless-stopped
     env_file:
       - ./.env
