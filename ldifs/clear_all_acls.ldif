@@ -2,7 +2,8 @@
 # This LDIF removes ALL existing olcAccess attributes from the mdb database.
 # Use this to start with a clean slate for ACL configuration.
 #
-# IMPORTANT: Bind as "cn=admin,cn=config" with LDAP_CONFIG_PASSWORD.
+# IMPORTANT: When applying this LDIF, you MUST bind as the LDAP configuration administrator.
+# The bind DN is "cn=admin,cn=config" and the password is set via LDAP_CONFIG_PASSWORD.
 
 dn: olcDatabase={1}mdb,cn=config
 changetype: modify
