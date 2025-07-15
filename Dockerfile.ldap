@@ -1,8 +1,6 @@
 # Dockerfile for the LDAP service
 FROM osixia/openldap:1.5.0
-
-# Copy custom schema files into the container (REMOVED: This line is no longer needed for standard schemas)
-# COPY ./ldap_init_config/schema/ /container/service/slapd/assets/config/bootstrap/ldif/custom/schema/
+# Base on the osixia/openldap image
 
 # Copy the initial data LDIFs (e.g., for OUs like 'contacts')
 # This is still needed for your custom OUs and initial data.
