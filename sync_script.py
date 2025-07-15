@@ -373,6 +373,11 @@ for book_url in address_book_urls:
             if not surname:
                 surname = "N/A" # Placeholder for required 'sn' attribute
 
+            # --- NEW DEBUGGING: Print extracted names immediately ---
+            if debug_python_enabled:
+                print(f"DEBUG: After FN/N parsing - full_name: '{full_name}', given_name: '{given_name}', surname: '{surname}'")
+                sys.stdout.flush()
+
 
             # Extract Email addresses
             emails = [str(e.value).strip() for e in getattr(vobj, "email_list", []) if e.value]
@@ -674,7 +679,7 @@ for contact in all_parsed_contacts:
             if 'l' in display_attributes:
                 display_attributes['l'] = '[REDACTED_LOCALITY]'
             if 'postalCode' in display_attributes:
-                display_attributes['postalCode'] = ['[REDACTED_POSTAL_CODE]' for _ in display_attributes['postalCode']]
+                display_attributes['postalCode'] = '[REDACTED_POSTAL_CODE]' # Postal code can be single or multi-valued depending on schema
             # Censor organization and categories
             if 'o' in display_attributes:
                 display_attributes['o'] = '[REDACTED_ORG]'
