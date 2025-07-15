@@ -1,3 +1,0 @@
-dn: ou=contacts,dc=example,dc=com
-objectClass: organizationalUnit
-ou: contacts
