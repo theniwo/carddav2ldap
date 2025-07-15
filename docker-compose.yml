@@ -18,9 +18,9 @@ services:
     env_file:
       - ./.env
     environment:
-      # LDAP base DN configuration - Adjusted default to niwo.home for correct dc components
-      - LDAP_ORGANISATION=${LDAP_ORGANISATION:-niwo}
-      - LDAP_DOMAIN=${LDAP_DOMAIN:-niwo.home} # Corrected to niwo.home for dc=niwo,dc=home
+      # LDAP base DN configuration - Adjusted default to example.com for correct dc components
+      - LDAP_ORGANISATION=${LDAP_ORGANISATION:-example} # Changed default to example
+      - LDAP_DOMAIN=${LDAP_DOMAIN:-example.com} # Changed default to example.com
       # Admin user configuration (password from .env file)
       - LDAP_PASSWORD=${LDAP_PASSWORD}
       # Password for the cn=admin,cn=config user (for configuration database access)
