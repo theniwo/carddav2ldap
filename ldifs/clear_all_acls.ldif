@@ -1,0 +1,10 @@
+# clear_all_acls.ldif
+# This LDIF removes ALL existing olcAccess attributes from the mdb database.
+# Use this to start with a clean slate for ACL configuration.
+#
+# IMPORTANT: Bind as "cn=admin,cn=config" with LDAP_CONFIG_PASSWORD.
+
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+delete: olcAccess
+

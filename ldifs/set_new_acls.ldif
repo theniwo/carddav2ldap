@@ -1,0 +1,14 @@
+# set_new_acls.ldif
+# This LDIF adds the desired ACL rules:
+# 1. Specific rule for ou=contacts: read for printer/phone, read for other authenticated, none for anonymous.
+# 2. General rule for the rest of the directory: self write, users read, anonymous auth, others none.
+#
+# IMPORTANT: Bind as "cn=admin,cn=config" with LDAP_CONFIG_PASSWORD.
+
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {0}to dn.subtree="ou=contacts,dc=niwo,dc=home" by dn.exact="cn=printer,ou=contacts,dc=niwo,dc=home" read by dn.exact="cn=phone,ou=contacts,dc=niwo,dc=home" read by users read by anonymous none
+-
+add: olcAccess
+olcAccess: {1}to * by self write by users read by anonymous auth by * none
