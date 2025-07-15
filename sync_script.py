@@ -8,13 +8,13 @@ import ldap3
 from ldap3.core.exceptions import LDAPEntryAlreadyExistsResult
 from requests.auth import HTTPBasicAuth
 import sys
-import urllib.parse # Import urllib.parse for robust URL concatenation
-import urllib3 # For suppressing InsecureRequestWarning
+import urllib.parse
+import urllib3
 import binascii # Import for Base64 decoding errors
 import base64   # Import for Base64 encoding/dekoding if needed for PHOTO field
 import re       # Import for regular expressions to clean phone numbers
 
-# --- Environment variable definitions ---
+# --- Environment variable definitions (renamed for carddav2ldap project) ---
 # CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
 # This URL should list all your address books as sub-collections.
 CARDDAV_BASE_DISCOVERY_URL = os.getenv("CARDDAV_BASE_DISCOVERY_URL")
@@ -87,7 +87,7 @@ carddav_password = os.getenv("CARDDAV_PASSWORD") # Get password value as is for 
 ssl_verify = get_boolean_env("CARDDAV_SSL_VERIFY", default=True) # Default to True for security
 import_photos = get_boolean_env("CARDDAV_IMPORT_PHOTOS", default=False) # Default to False for photo import
 # Use the global 'DEBUG' variable to control Python debug output
-debug_python_enabled = get_boolean_env("DEBUG", default=False)
+debug_python_enabled = get_boolean_env("DEBUG", default=False) 
 
 # Get CENSOR_SECRETS_IN_LOGS setting from environment for Python script
 censor_secrets_in_logs_enabled = get_boolean_env("CENSOR_SECRETS_IN_LOGS", default=True)
@@ -207,7 +207,7 @@ for response_elem in discovery_root.findall(".//d:response", discovery_ns):
         if resourcetype_elem.find(".//c:addressbook", discovery_ns) is not None:
             relative_url_path = href_elem.text.strip()
             full_url = urllib.parse.urljoin(carddav_base_discovery_url, relative_url_path)
-
+            
             # Extract address book name from displayname or URL path
             addressbook_name = displayname_elem.text.strip() if displayname_elem is not None else ""
             if not addressbook_name:
@@ -216,24 +216,18 @@ for response_elem in discovery_root.findall(".//d:response", discovery_ns):
                 path_parts = [p for p in full_url.split('/') if p]
                 if path_parts:
                     # Try to get the last part if it's not the domain or a common DAV endpoint
-                    if path_parts[-1] not in ["addressbooks", "dav.php", "user"]: # Added "user" to exclude common path segments
+                    if path_parts[-1] not in ["addressbooks", "dav.php"]:
                         addressbook_name = path_parts[-1]
-                    elif len(path_parts) > 1 and path_parts[-2] not in ["addressbooks", "dav.php", "user"]:
+                    elif len(path_parts) > 1 and path_parts[-2] not in ["addressbooks", "dav.php"]:
                         addressbook_name = path_parts[-2] # e.g., for /user/
-                if not addressbook_name: # Final fallback if still no name
-                    addressbook_name = full_url # Use full URL as name if nothing else works
-
-            print(f"DEBUG: Discovered address book: '{addressbook_name}' at URL: '{full_url}'") # Added debug for clarity
-
+            
             # Apply address book filters
-            if CARDDAV_ADDRESSBOOK_WHITELIST:
-                if not is_addressbook_whitelisted(addressbook_name, CARDDAV_ADDRESSBOOK_WHITELIST):
-                    print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to not being in whitelist.")
-                    continue
-            if CARDDAV_ADDRESSBOOK_BLACKLIST:
-                if is_addressbook_blacklisted(addressbook_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
-                    print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to being in blacklist.")
-                    continue
+            if CARDDAV_ADDRESSBOOK_WHITELIST and not is_addressbook_whitelisted(addressbook_name, CARDDAV_ADDRESSBOOK_WHITELIST):
+                print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to not being in whitelist.")
+                continue
+            if CARDDAV_ADDRESSBOOK_BLACKLIST and is_addressbook_blacklisted(addressbook_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
+                print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to being in blacklist.")
+                continue
 
             address_book_urls.append(full_url)
 
@@ -242,27 +236,17 @@ if not address_book_urls:
     # Attempt to use CARDDAV_BASE_DISCOVERY_URL itself as a single address book if no others found.
     # This covers cases where the discovery URL IS the the address book.
     print(f"Attempting to use {carddav_base_discovery_url} as a single address book.")
-
-    # Extract name for filtering the base URL itself if used as a fallback
+    
+    # Apply address book filters to the base URL itself if used as a fallback
     base_url_name = urllib.parse.urlparse(carddav_base_discovery_url).path.strip('/').split('/')[-1]
     if not base_url_name:
         base_url_name = urllib.parse.urlparse(carddav_base_discovery_url).netloc # Fallback to domain if path is empty
-    if not base_url_name:
-        base_url_name = carddav_base_discovery_url # Use full URL as name if nothing else works
-
-    print(f"DEBUG: Attempting to filter base URL as address book: '{base_url_name}'") # Added debug for clarity
-
-    if CARDDAV_ADDRESSBOOK_WHITELIST:
-        if not is_addressbook_whitelisted(base_url_name, CARDDAV_ADDRESSBOOK_WHITELIST):
-            print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to not being in whitelist.")
-        else:
-            address_book_urls.append(carddav_base_discovery_url)
-    elif CARDDAV_ADDRESSBOOK_BLACKLIST:
-        if is_addressbook_blacklisted(base_url_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
-            print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to being in blacklist.")
-        else:
-            address_book_urls.append(carddav_base_discovery_url)
-    else: # If no whitelist or blacklist for address books, add the base URL
+    
+    if CARDDAV_ADDRESSBOOK_WHITELIST and not is_addressbook_whitelisted(base_url_name, CARDDAV_ADDRESSBOOK_WHITELIST):
+        print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to not being in whitelist.")
+    elif CARDDAV_ADDRESSBOOK_BLACKLIST and is_addressbook_blacklisted(base_url_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
+        print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to being in blacklist.")
+    else:
         address_book_urls.append(carddav_base_discovery_url)
 
 
@@ -319,22 +303,49 @@ for book_url in address_book_urls:
             # Parse the vCard string using vobject
             vobj = vobject.readOne(vcard_blob)
 
-            # Extract Full Name (FN)
+            # --- Extract Full Name (FN) ---
+            full_name = ""
             fn_obj = getattr(vobj, "fn", None)
-            full_name = str(fn_obj.value).strip() if fn_obj and fn_obj.value else ""
+            if debug_python_enabled:
+                print(f"DEBUG: Raw FN object: {fn_obj!r}") # Use !r for raw representation
+                if fn_obj:
+                    print(f"DEBUG: FN object value (raw): {getattr(fn_obj, 'value', 'N/A')!r}")
+                    print(f"DEBUG: FN object contents (raw): {getattr(fn_obj, 'contents', 'N/A')!r}")
 
-            # Extract Given Name (FIRST NAME from N property) and Surname (LAST NAME from N property)
+            if fn_obj:
+                if hasattr(fn_obj, 'value') and fn_obj.value is not None:
+                    # Prefer fn.value if it exists and is not None
+                    full_name = str(fn_obj.value).strip()
+                elif hasattr(fn_obj, 'contents') and fn_obj.contents:
+                    # Fallback to fn.contents if fn.value is None or missing
+                    if isinstance(fn_obj.contents, dict) and 'value' in fn_obj.contents and fn_obj.contents['value']:
+                        full_name = str(fn_obj.contents['value'][0]).strip()
+                    elif isinstance(fn_obj.contents, list) and fn_obj.contents:
+                        full_name = str(fn_obj.contents[0]).strip()
+                
+                # Final check for full_name from FN object itself if still empty
+                if not full_name and str(fn_obj) and str(fn_obj).startswith('FN:'):
+                    full_name = str(fn_obj)[3:].strip() # Remove "FN:" prefix
+
+
+            # --- Extract Given Name (FIRST NAME from N property) and Surname (LAST NAME from N property) ---
             given_name = ""
             surname = ""
             n_obj = getattr(vobj, "n", None)
+            if debug_python_enabled:
+                print(f"DEBUG: Raw N object: {n_obj!r}")
+                if n_obj:
+                    print(f"DEBUG: N object first: {getattr(n_obj, 'first', 'N/A')!r}")
+                    print(f"DEBUG: N object last: {getattr(n_obj, 'last', 'N/A')!r}")
+
             if n_obj:
                 # Ensure attributes exist before accessing and normalize to str
                 given_name = str(getattr(n_obj, 'first', '')).strip()
                 surname = str(getattr(n_obj, 'last', '')).strip()
-
-            # Fallback for full_name if FN is missing (existing logic, adjusted for n_obj attributes)
+            
+            # --- Fallback for full_name if FN was empty or problematic ---
             if not full_name:
-                # If FN is empty, try to construct full_name from N (FirstName LastName)
+                # If FN was empty, try to construct full_name from N (FirstName LastName)
                 if given_name and surname:
                     full_name = f"{given_name} {surname}".strip()
                 elif given_name:
@@ -356,7 +367,7 @@ for book_url in address_book_urls:
                     # If full_name is a single word or no clear surname can be extracted,
                     # use the full_name itself as surname. This satisfies 'sn' requirement.
                     surname = full_name.strip()
-
+            
             # Final check: If surname is STILL empty after all fallbacks, set a placeholder.
             # This handles cases where full_name might also be empty or derived as empty.
             if not surname:
@@ -382,9 +393,9 @@ for book_url in address_book_urls:
 
                 if cleaned_phone: # Only process non-empty cleaned numbers
                     all_cleaned_phones.append(cleaned_phone) # Add to general list
-
+                    
                     types = [t.upper() for t in getattr(tel_obj, 'type_param', [])]
-
+                    
                     if 'WORK' in types:
                         work_phones.append(cleaned_phone)
                     if 'FAX' in types:
@@ -407,7 +418,7 @@ for book_url in address_book_urls:
                 street_address = str(getattr(first_adr, 'street', '')).strip()
                 locality = str(getattr(first_adr, 'city', '')).strip() # 'city' maps to Locality
                 postal_code = str(getattr(first_adr, 'code', '')).strip() # 'code' maps to Postal Code
-
+            
             # --- Extract Organization (Company Name) and Organizational Unit (Department) ---
             organization = ""
             organizational_unit = ""
@@ -491,7 +502,7 @@ for book_url in address_book_urls:
                 if any(is_email_blacklisted(email, CARDDAV_EMAIL_BLACKLIST_DOMAINS) for email in contact_data['emails']):
                     print(f"INFO: Skipping contact '{contact_data['full_name']}' due to email in blacklist.")
                     continue
-
+            
             # Filter by category
             if CARDDAV_CATEGORY_WHITELIST:
                 if not is_category_whitelisted(contact_data['categories'], CARDDAV_CATEGORY_WHITELIST):
@@ -591,7 +602,7 @@ for contact in all_parsed_contacts:
             attributes['mail'] = raw_email.encode('utf-8') # Explicitly encode
         else:
             print(f"WARNING: Email for '{contact['full_name']}' is malformed: '{raw_email}'. Skipping email attribute.")
-
+    
     # Add address attributes only if they have non-empty values
     if contact['street_address']:
         attributes['streetAddress'] = contact['street_address'].encode('utf-8') # Explicitly encode
@@ -599,7 +610,7 @@ for contact in all_parsed_contacts:
         attributes['l'] = contact['locality'].encode('utf-8') # Explicitly encode
     if contact['postal_code']:
         attributes['postalCode'] = contact['postal_code'].encode('utf-8') # Explicitly encode
-
+    
     # Add Organization (Company Name)
     if contact['organization']:
         attributes['o'] = contact['organization'].encode('utf-8') # Explicitly encode
@@ -650,7 +661,7 @@ for contact in all_parsed_contacts:
                     display_attributes['telephoneNumber'] = '[REDACTED_PHONE]'
                 elif isinstance(display_attributes['telephoneNumber'], list):
                     display_attributes['telephoneNumber'] = ['[REDACTED_PHONE]' for _ in display_attributes['telephoneNumber']]
-
+            
             if 'homePhone' in display_attributes:
                 display_attributes['homePhone'] = ['[REDACTED_PHONE]' for _ in display_attributes['homePhone']]
             if 'mobile' in display_attributes:
@@ -663,7 +674,7 @@ for contact in all_parsed_contacts:
             if 'l' in display_attributes:
                 display_attributes['l'] = '[REDACTED_LOCALITY]'
             if 'postalCode' in display_attributes:
-                display_attributes['postalCode'] = '[REDACTED_POSTAL_CODE]' # Postal code can be single or multi-valued depending on schema
+                display_attributes['postalCode'] = ['[REDACTED_POSTAL_CODE]' for _ in display_attributes['postalCode']]
             # Censor organization and categories
             if 'o' in display_attributes:
                 display_attributes['o'] = '[REDACTED_ORG]'
@@ -673,7 +684,7 @@ for contact in all_parsed_contacts:
                 display_attributes['title'] = '[REDACTED_TITLE]'
             if 'businessCategory' in display_attributes:
                 display_attributes['businessCategory'] = ['[REDACTED_CATEGORY]' for _ in display_attributes['businessCategory']]
-
+        
         print(f"DEBUG: Parsed contact data (before LDAP operation): {contact}") # Added for troubleshooting
         print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {display_attributes}")
         sys.stdout.flush() # Flush print statement immediately
@@ -690,7 +701,7 @@ for contact in all_parsed_contacts:
             for attr_name, attr_value in attributes.items():
                 if attr_name in ['objectClass', 'cn', 'sn']: # These are typically not modified
                     continue
-
+                
                 # For multi-valued attributes, check if the value is a list
                 if isinstance(attr_value, list):
                     # Replace existing values with the new list of values
@@ -698,7 +709,7 @@ for contact in all_parsed_contacts:
                 else:
                     # For single-valued attributes, wrap in a list for replacement
                     changes[attr_name] = [(ldap3.MODIFY_REPLACE, [attr_value])]
-
+            
             # Perform the modify operation only if there are changes to apply
             if changes:
                 conn.modify(ldap_dn, changes)
