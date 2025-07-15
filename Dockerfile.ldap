@@ -7,19 +7,16 @@ FROM osixia/openldap:1.5.0
 # Set the working directory (optional, but good practice)
 WORKDIR /app
 
-# Copy the custom schema files into the image
-# These files should be placed in a directory named 'ldap_schemas' relative to this Dockerfile.
-# Ensure these are the *corrected* schema files (uncommented lines, no SINGLE-VALUE for multi-valued attributes).
-#COPY ./ldap_init_config/schemas/core.ldif /etc/ldap/schema
-#COPY ./ldap_init_config/schemas/cosine.ldif /etc/ldap/schema
-#COPY ./ldap_init_config/schemas/inetorgperson.ldif /etc/ldap/schema
-#COPY ./ldap_schemas/core.ldif /etc/ldap/schema/core.ldif
-#COPY ./ldap_schemas/cosine.ldif /etc/ldap/schema/cosine.ldif
-#COPY ./ldap_schemas/inetorgperson.ldif /etc/ldap/schema/inetorgperson.ldif
+# IMPORTANT: Do NOT copy standard schemas like core.ldif, cosine.ldif, inetorgperson.ldif to /etc/ldap/schema.
+# The base image already provides them, and copying them here will cause "Duplicate attributeType" errors.
+# If you have *custom* schemas, they should be copied to:
+# /container/service/slapd/assets/config/bootstrap/ldif/custom/schema/
+# Example for custom schemas (uncomment and adjust path if needed):
+# COPY ./ldap_init_config/data/custom_schema/ /container/service/slapd/assets/config/bootstrap/ldif/custom/schema/
 
 # Copy the initial LDIF files into the image
 # These files will be loaded by the osixia/openldap container on first setup.
-# Ensure these are placed in a directory named 'ldap_init_config' relative to this Dockerfile.
+# Ensure these are placed in a directory named 'ldap_init_config/data' relative to this Dockerfile.
 COPY ./ldap_init_config/data/ /container/service/slapd/assets/config/bootstrap/ldif/custom/data/
 
 # Copy the custom LDAP entrypoint script and make it executable
