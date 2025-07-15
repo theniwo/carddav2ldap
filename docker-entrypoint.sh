@@ -1,5 +1,5 @@
 #!/bin/bash
-# docker-entrypoint.sh
+set -e
 
 # Get CENSOR_SECRETS_IN_LOGS setting early
 CENSOR_SECRETS_IN_LOGS_ENABLED=true
@@ -58,7 +58,7 @@ if [[ "${DEBUG,,}" == "true" ]]; then
     echo "DEBUG: Contents of $ENV_FILE created by entrypoint:"
     # Apply redaction ONLY when displaying the output here, if enabled
     if [[ "$CENSOR_SECRETS_IN_LOGS_ENABLED" == "true" ]]; then
-        cat "$ENV_FILE" | sed -E 's/^(export (LDAP_PASSWORD|CARDDAV_PASSWORD))=".*/\1="[REDACTED]"/g'
+        cat "$ENV_FILE" | sed -E 's/^(LDAP_PASSWORD|CARDDAV_PASSWORD))=".*/\1="[REDACTED]"/g'
     else
         cat "$ENV_FILE"
     fi
@@ -73,7 +73,7 @@ echo "CRON_SCHEDULE is set to: $CRON_SCHEDULE"
 # Create a temporary file for the crontab entries
 CRON_FILE=$(mktemp)
 
-# Command to run
+# Command to run the sync script
 COMMAND="/bin/bash -c /app/sync_script.sh >> /proc/1/fd/1 2>&1"
 
 # Add the @reboot job to run the script once on container start/reboot
@@ -91,6 +91,8 @@ rm "$CRON_FILE"
 # Make the environment file executable (though 'source' doesn't strictly require it)
 chmod +x "$ENV_FILE"
 
-# Execute the original CMD (which is "cron -f")
-exec "$@"
+# --- NEW: Explicitly start cron and keep container alive ---
+echo "$(date): Starting cron daemon in foreground..."
+# Start cron in the background. This ensures the entrypoint script continues to tail the log.
+cron -f
 
