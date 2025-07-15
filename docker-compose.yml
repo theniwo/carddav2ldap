@@ -1,3 +1,5 @@
+version: '3.8'
+
 volumes:
   ldap_data:
   ldap_config:
@@ -8,21 +10,21 @@ volumes:
 services:
   ldap:
     # Use the custom-built image instead of the public one
-    #build:
-      #context: .
-      #dockerfile: Dockerfile.ldap # Specify the new Dockerfile for LDAP
-    image: osixia/openldap # This line is commented out as we are building a custom image
+    build:
+      context: .
+      dockerfile: Dockerfile.ldap # Specify the new Dockerfile for LDAP
+    #image: osixia/openldap # This line is commented out as we are building a custom image
     restart: unless-stopped
     env_file:
       - ./.env
     environment:
-      # LDAP base DN configuration
-      - LDAP_ORGANISATION=${LDAP_ORGANISATION:-example}
-      - LDAP_DOMAIN=${LDAP_DOMAIN:-example.com}
+      # LDAP base DN configuration - Adjusted default to niwo.home for correct dc components
+      - LDAP_ORGANISATION=${LDAP_ORGANISATION:-niwo}
+      - LDAP_DOMAIN=${LDAP_DOMAIN:-niwo.home} # Corrected to niwo.home for dc=niwo,dc=home
       # Admin user configuration (password from .env file)
       - LDAP_PASSWORD=${LDAP_PASSWORD}
       # Password for the cn=admin,cn=config user (for configuration database access)
-      - LDAP_CONFIG_PASSWORD=${LDAP_CONFIG_PASSWORD} # NEW: Added for config admin access
+      - LDAP_CONFIG_PASSWORD=${LDAP_CONFIG_PASSWORD} # Added for config admin access
       # Forces re-initialization of the configuration on startup.
       # IMPORTANT: Set to 'true' to ensure schema and initial LDIF changes are applied
       # after a 'docker-compose down -v' and 'docker-compose up'.
@@ -66,8 +68,8 @@ services:
       - CARDDAV_IMPORT_PHOTOS=${CARDDAV_IMPORT_PHOTOS:-false}
       # LDAP Configuration
       - LDAP_SERVER=${LDAP_SERVER:-ldap://ldap:389} # Uses the service name 'ldap'
-      - LDAP_BASE_DN=${LDAP_BASE_DN:-ou=contacts,dc=example,dc=com} # Aligned with LDAP service defaults
-      - LDAP_USER=${LDAP_USER:-cn=admin,dc=example,dc=com} # Aligned with LDAP service defaults
+      - LDAP_BASE_DN=${LDAP_BASE_DN:-ou=contacts,dc=niwo,dc=home} # Aligned with LDAP service defaults
+      - LDAP_USER=${LDAP_USER:-cn=admin,dc=niwo,dc=home} # Aligned with LDAP service defaults
       - LDAP_PASSWORD=${LDAP_PASSWORD} # Uses the admin password for the sync user
       # Debug Settings
       - DEBUG=${DEBUG:-false}
