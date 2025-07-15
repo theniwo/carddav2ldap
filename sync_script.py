@@ -13,6 +13,7 @@ import urllib3
 import binascii # Import for Base64 decoding errors
 import base64   # Import for Base64 encoding/dekoding if needed for PHOTO field
 import re       # Import for regular expressions to clean phone numbers
+from ldap3.utils.dn import escape_rdn # Import for escaping RDN components
 
 # --- Environment variable definitions (renamed for carddav2ldap project) ---
 # CardDAV base URL for discovering address books (e.g., "https://your.carddav.server/dav.php/addressbooks/user/")
@@ -365,8 +366,8 @@ for book_url in address_book_urls:
                     surname = full_name.split()[-1].strip()
                 else:
                     # If full_name is a single word or no clear surname can be extracted,
-                    # use the full_name itself as surname. This satisfies 'sn' requirement.
-                    surname = full_name.strip()
+                    # use the the first part of the full_name as surname. This satisfies 'sn' requirement.
+                    surname = full_name.split()[0].strip() if ' ' in full_name else full_name.strip()
             
             # Final check: If surname is STILL empty after all fallbacks, set a placeholder.
             # This handles cases where full_name might also be empty or derived as empty.
@@ -569,7 +570,9 @@ for contact in all_parsed_contacts:
     # Construct the DN (Distinguished Name) for the LDAP entry
     # Using 'cn' (Common Name) for the RDN (Relative Distinguished Name)
     # Ensure CN is properly encoded for the DN string itself
-    ldap_dn = f"cn={contact['full_name']},{ldap_base_dn}"
+    # Use escape_rdn for the CN component to handle special characters correctly
+    escaped_cn = escape_rdn(contact['full_name'])
+    ldap_dn = f"cn={escaped_cn},{ldap_base_dn}"
 
     # Define LDAP attributes for the entry
     # All values are now expected to be Python unicode strings from parsing.
@@ -691,6 +694,7 @@ for contact in all_parsed_contacts:
                 display_attributes['businessCategory'] = ['[REDACTED_CATEGORY]' for _ in display_attributes['businessCategory']]
         
         print(f"DEBUG: Parsed contact data (before LDAP operation): {contact}") # Added for troubleshooting
+        print(f"DEBUG: Constructed LDAP DN: '{ldap_dn}'") # NEW: Print the final DN
         print(f"DEBUG: Attempting to add DN: '{ldap_dn}' with attributes: {display_attributes}")
         sys.stdout.flush() # Flush print statement immediately
 
