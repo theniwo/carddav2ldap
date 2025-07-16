@@ -402,29 +402,35 @@ for book_url in address_book_urls:
                 if cleaned_phone: # Only process non-empty cleaned numbers
                     all_cleaned_phones.append(cleaned_phone) # Add to general list
                     
-                    types = [t.upper() for t in getattr(tel_obj, 'type_param', [])]
+                    # Debugging: Print the raw tel_obj and its parameters
+                    if debug_python_enabled:
+                        print(f"DEBUG: Processing tel_obj: {tel_obj!r}")
+                        print(f"DEBUG:   tel_obj.params: {tel_obj.params!r}")
+                        sys.stdout.flush()
+
+                    # Try accessing parameters via .params dictionary
+                    # vobject stores parameters in a dictionary, e.g., {'TYPE': ['VOICE', 'WORK']}
+                    raw_type_params_from_params = tel_obj.params.get('TYPE', [])
+                    types = [t.upper() for t in raw_type_params_from_params]
                     
                     if debug_python_enabled:
-                        print(f"DEBUG: Processing phone: '{raw_phone}', Cleaned: '{cleaned_phone}', Types: {types}")
+                        print(f"DEBUG: Processing phone: '{raw_phone}', Cleaned: '{cleaned_phone}'")
+                        print(f"DEBUG:   Raw type_param (from .params): {raw_type_params_from_params!r}, Processed Types: {types!r}")
+                        sys.stdout.flush() # Ensure flush for immediate feedback
 
                     # Check for specific types - a number can belong to multiple categories
+                    if 'FAX' in types: # Prioritize FAX
+                        fax_numbers.append(cleaned_phone)
                     if 'WORK' in types:
                         work_phones.append(cleaned_phone)
                     if 'HOME' in types:
                         home_phones.append(cleaned_phone)
                     if 'CELL' in types or 'MOBILE' in types:
                         mobile_phones.append(cleaned_phone)
-                    if 'FAX' in types:
-                        fax_numbers.append(cleaned_phone)
                     
-                    # If after checking all specific types, the number hasn't been added to any,
-                    # or if it has generic types like 'VOICE' without specific context, add to 'other_phones'.
-                    # We ensure it's not already in a specific list to avoid duplication if it's purely generic.
-                    # This logic needs to be careful to not double-add if a number is e.g., WORK and VOICE.
-                    # The current approach adds to specific lists, then combines them for 'telephoneNumber'.
-                    # 'other_phones' should capture numbers that are *only* generic or uncategorized.
-                    # A better approach is to add to 'other_phones' only if NO specific type is found.
-                    if not ('WORK' in types or 'HOME' in types or 'CELL' in types or 'MOBILE' in types or 'FAX' in types):
+                    # Add to 'other_phones' only if it wasn't specifically categorized
+                    # This check needs to be AFTER all specific categorizations.
+                    if not any(t in types for t in ['WORK', 'HOME', 'CELL', 'MOBILE', 'FAX']):
                         other_phones.append(cleaned_phone)
 
 
