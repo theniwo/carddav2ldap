@@ -407,23 +407,24 @@ for book_url in address_book_urls:
                     if debug_python_enabled:
                         print(f"DEBUG: Processing phone: '{raw_phone}', Cleaned: '{cleaned_phone}', Types: {types}")
 
-                    # Check for specific types
-                    is_categorized = False
+                    # Check for specific types - a number can belong to multiple categories
                     if 'WORK' in types:
                         work_phones.append(cleaned_phone)
-                        is_categorized = True
-                    if 'FAX' in types:
-                        fax_numbers.append(cleaned_phone)
-                        is_categorized = True
-                    if 'CELL' in types or 'MOBILE' in types:
-                        mobile_phones.append(cleaned_phone)
-                        is_categorized = True
                     if 'HOME' in types:
                         home_phones.append(cleaned_phone)
-                        is_categorized = True
+                    if 'CELL' in types or 'MOBILE' in types:
+                        mobile_phones.append(cleaned_phone)
+                    if 'FAX' in types:
+                        fax_numbers.append(cleaned_phone)
                     
-                    # If no specific type was found, add to 'other_phones'
-                    if not is_categorized:
+                    # If after checking all specific types, the number hasn't been added to any,
+                    # or if it has generic types like 'VOICE' without specific context, add to 'other_phones'.
+                    # We ensure it's not already in a specific list to avoid duplication if it's purely generic.
+                    # This logic needs to be careful to not double-add if a number is e.g., WORK and VOICE.
+                    # The current approach adds to specific lists, then combines them for 'telephoneNumber'.
+                    # 'other_phones' should capture numbers that are *only* generic or uncategorized.
+                    # A better approach is to add to 'other_phones' only if NO specific type is found.
+                    if not ('WORK' in types or 'HOME' in types or 'CELL' in types or 'MOBILE' in types or 'FAX' in types):
                         other_phones.append(cleaned_phone)
 
 
@@ -606,7 +607,7 @@ for contact in all_parsed_contacts:
 
     # Add various phone number attributes
     # The 'telephoneNumber' attribute can be multi-valued.
-    # We will combine all generic, work, home, and mobile numbers into 'telephoneNumber'.
+    # We will combine all general, work, home, and mobile numbers into 'telephoneNumber'.
     # Fax numbers will go into 'facsimileTelephoneNumber'.
     all_general_phones = []
     all_general_phones.extend(contact['work_phones'])
