@@ -390,6 +390,8 @@ for book_url in address_book_urls:
             home_phones = []
             mobile_phones = []
             fax_numbers = []
+            # New list for other/unspecified phone numbers
+            other_phones = []
 
             for tel_obj in getattr(vobj, "tel_list", []):
                 raw_phone = str(tel_obj.value).strip()
@@ -402,14 +404,28 @@ for book_url in address_book_urls:
                     
                     types = [t.upper() for t in getattr(tel_obj, 'type_param', [])]
                     
+                    if debug_python_enabled:
+                        print(f"DEBUG: Processing phone: '{raw_phone}', Cleaned: '{cleaned_phone}', Types: {types}")
+
+                    # Check for specific types
+                    is_categorized = False
                     if 'WORK' in types:
                         work_phones.append(cleaned_phone)
+                        is_categorized = True
                     if 'FAX' in types:
                         fax_numbers.append(cleaned_phone)
+                        is_categorized = True
                     if 'CELL' in types or 'MOBILE' in types:
                         mobile_phones.append(cleaned_phone)
+                        is_categorized = True
                     if 'HOME' in types:
                         home_phones.append(cleaned_phone)
+                        is_categorized = True
+                    
+                    # If no specific type was found, add to 'other_phones'
+                    if not is_categorized:
+                        other_phones.append(cleaned_phone)
+
 
             # --- Extract Address Information (Street, City, Postal Code) ---
             # The ADR property can have multiple parts. We'll take the first one found.
@@ -488,6 +504,7 @@ for book_url in address_book_urls:
                 "home_phones": home_phones,
                 "mobile_phones": mobile_phones,
                 "fax_numbers": fax_numbers,
+                "other_phones": other_phones, # New: list for other/unspecified phones
                 "street_address": street_address, # New address field
                 "locality": locality,             # New address field
                 "postal_code": postal_code,       # New address field
@@ -588,17 +605,23 @@ for contact in all_parsed_contacts:
         attributes['givenName'] = contact['given_name'].encode('utf-8') # Explicitly encode
 
     # Add various phone number attributes
-    # Prioritize work phone for general telephoneNumber, fallback to all_phones
-    if contact['work_phones']:
-        attributes['telephoneNumber'] = contact['work_phones'][0].encode('utf-8')
-    elif contact['all_phones']:
-        attributes['telephoneNumber'] = contact['all_phones'][0].encode('utf-8')
+    # The 'telephoneNumber' attribute can be multi-valued.
+    # We will combine all generic, work, home, and mobile numbers into 'telephoneNumber'.
+    # Fax numbers will go into 'facsimileTelephoneNumber'.
+    all_general_phones = []
+    all_general_phones.extend(contact['work_phones'])
+    all_general_phones.extend(contact['home_phones'])
+    all_general_phones.extend(contact['mobile_phones'])
+    all_general_phones.extend(contact['other_phones']) # Include any uncategorized phones
+
+    # Ensure uniqueness if numbers might appear in multiple categories
+    all_general_phones = list(set(all_general_phones))
+
+    if all_general_phones:
+        attributes['telephoneNumber'] = [p.encode('utf-8') for p in all_general_phones]
 
     # Add specific phone number types if they exist
-    if contact['home_phones']:
-        attributes['homePhone'] = [p.encode('utf-8') for p in contact['home_phones']]
-    if contact['mobile_phones']:
-        attributes['mobile'] = [p.encode('utf-8') for p in contact['mobile_phones']]
+    # These are already lists, so we just check if they are non-empty
     if contact['fax_numbers']:
         attributes['facsimileTelephoneNumber'] = [p.encode('utf-8') for p in contact['fax_numbers']]
 
