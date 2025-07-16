@@ -217,18 +217,25 @@ for response_elem in discovery_root.findall(".//d:response", discovery_ns):
                 path_parts = [p for p in full_url.split('/') if p]
                 if path_parts:
                     # Try to get the last part if it's not the domain or a common DAV endpoint
-                    if path_parts[-1] not in ["addressbooks", "dav.php"]:
+                    if path_parts[-1] not in ["addressbooks", "dav.php", "user"]: # Added "user" to exclude common path segments
                         addressbook_name = path_parts[-1]
-                    elif len(path_parts) > 1 and path_parts[-2] not in ["addressbooks", "dav.php"]:
+                    elif len(path_parts) > 1 and path_parts[-2] not in ["addressbooks", "dav.php", "user"]:
                         addressbook_name = path_parts[-2] # e.g., for /user/
-            
+                if not addressbook_name: # Final fallback if still no name
+                    addressbook_name = full_url # Use full URL as name if nothing else works
+
+            if debug_python_enabled:
+                print(f"DEBUG: Discovered address book: '{addressbook_name}' at URL: '{full_url}'") # Added debug for clarity
+
             # Apply address book filters
-            if CARDDAV_ADDRESSBOOK_WHITELIST and not is_addressbook_whitelisted(addressbook_name, CARDDAV_ADDRESSBOOK_WHITELIST):
-                print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to not being in whitelist.")
-                continue
-            if CARDDAV_ADDRESSBOOK_BLACKLIST and is_addressbook_blacklisted(addressbook_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
-                print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to being in blacklist.")
-                continue
+            if CARDDAV_ADDRESSBOOK_WHITELIST:
+                if not is_addressbook_whitelisted(addressbook_name, CARDDAV_ADDRESSBOOK_WHITELIST):
+                    print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to not being in whitelist.")
+                    continue
+            if CARDDAV_ADDRESSBOOK_BLACKLIST:
+                if is_addressbook_blacklisted(addressbook_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
+                    print(f"INFO: Skipping address book '{addressbook_name}' ({full_url}) due to being in blacklist.")
+                    continue
 
             address_book_urls.append(full_url)
 
@@ -238,16 +245,27 @@ if not address_book_urls:
     # This covers cases where the discovery URL IS the the address book.
     print(f"Attempting to use {carddav_base_discovery_url} as a single address book.")
     
-    # Apply address book filters to the base URL itself if used as a fallback
+    # Extract name for filtering the base URL itself if used as a fallback
     base_url_name = urllib.parse.urlparse(carddav_base_discovery_url).path.strip('/').split('/')[-1]
     if not base_url_name:
         base_url_name = urllib.parse.urlparse(carddav_base_discovery_url).netloc # Fallback to domain if path is empty
+    if not base_url_name:
+        base_url_name = carddav_base_discovery_url # Use full URL as name if nothing else works
+
+    if debug_python_enabled:
+        print(f"DEBUG: Attempting to filter base URL as address book: '{base_url_name}'") # Added debug for clarity
     
-    if CARDDAV_ADDRESSBOOK_WHITELIST and not is_addressbook_whitelisted(base_url_name, CARDDAV_ADDRESSBOOK_WHITELIST):
-        print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to not being in whitelist.")
-    elif CARDDAV_ADDRESSBOOK_BLACKLIST and is_addressbook_blacklisted(base_url_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
-        print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to being in blacklist.")
-    else:
+    if CARDDAV_ADDRESSBOOK_WHITELIST:
+        if not is_addressbook_whitelisted(base_url_name, CARDDAV_ADDRESSBOOK_WHITELIST):
+            print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to not being in whitelist.")
+        else:
+            address_book_urls.append(carddav_base_discovery_url)
+    elif CARDDAV_ADDRESSBOOK_BLACKLIST:
+        if is_addressbook_blacklisted(base_url_name, CARDDAV_ADDRESSBOOK_BLACKLIST):
+            print(f"INFO: Skipping base URL '{base_url_name}' ({carddav_base_discovery_url}) due to being in blacklist.")
+        else:
+            address_book_urls.append(carddav_base_discovery_url)
+    else: # If no whitelist or blacklist for address books, add the base URL
         address_book_urls.append(carddav_base_discovery_url)
 
 
@@ -594,7 +612,6 @@ for contact in all_parsed_contacts:
     # Construct the DN (Distinguished Name) for the LDAP entry
     # Using 'cn' (Common Name) for the RDN (Relative Distinguished Name)
     # Ensure CN is properly encoded for the DN string itself
-    # Use escape_rdn for the CN component to handle special characters correctly
     escaped_cn = escape_rdn(contact['full_name'])
     ldap_dn = f"cn={escaped_cn},{ldap_base_dn}"
 
@@ -612,25 +629,35 @@ for contact in all_parsed_contacts:
         attributes['givenName'] = contact['given_name'].encode('utf-8') # Explicitly encode
 
     # Add various phone number attributes
-    # The 'telephoneNumber' attribute can be multi-valued.
-    # We will combine all general, work, home, and mobile numbers into 'telephoneNumber'.
-    # Fax numbers will go into 'facsimileTelephoneNumber'.
-    all_general_phones = []
-    all_general_phones.extend(contact['work_phones'])
-    all_general_phones.extend(contact['home_phones'])
-    all_general_phones.extend(contact['mobile_phones'])
-    all_general_phones.extend(contact['other_phones']) # Include any uncategorized phones
+    # Collect all non-fax phone numbers for telephoneNumber
+    non_fax_phones = []
+    non_fax_phones.extend(contact['work_phones'])
+    non_fax_phones.extend(contact['home_phones'])
+    non_fax_phones.extend(contact['mobile_phones'])
+    non_fax_phones.extend(contact['other_phones']) # Include any uncategorized phones
 
-    # Ensure uniqueness if numbers might appear in multiple categories
-    all_general_phones = list(set(all_general_phones))
+    # Filter out any numbers that are also identified as fax numbers
+    # This is crucial to prevent fax numbers from appearing in telephoneNumber
+    final_telephone_numbers = [p for p in non_fax_phones if p not in contact['fax_numbers']]
+    
+    # Ensure uniqueness
+    final_telephone_numbers = list(set(final_telephone_numbers))
 
-    if all_general_phones:
-        attributes['telephoneNumber'] = [p.encode('utf-8') for p in all_general_phones]
+    if final_telephone_numbers:
+        attributes['telephoneNumber'] = [p.encode('utf-8') for p in final_telephone_numbers]
+    else:
+        # If no non-fax phone numbers, ensure the attribute is not set or removed if it exists
+        if 'telephoneNumber' in attributes: # Check if it was added from previous runs
+            del attributes['telephoneNumber']
 
     # Add specific phone number types if they exist
     # These are already lists, so we just check if they are non-empty
     if contact['fax_numbers']:
         attributes['facsimileTelephoneNumber'] = [p.encode('utf-8') for p in contact['fax_numbers']]
+    else:
+        # If no fax numbers, ensure the attribute is not set or removed if it exists
+        if 'facsimileTelephoneNumber' in attributes: # Check if it was added from previous runs
+            del attributes['facsimileTelephoneNumber']
 
     # Add optional attributes if they exist
     if contact['emails']:
