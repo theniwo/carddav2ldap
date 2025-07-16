@@ -23,28 +23,42 @@ There are 3 containers:
 
 **sync** runs a script periodically to fetch carddav data and spill it into the ldap directory.
 
-**web** is used for external provisioning templates. You can delete it if you don't need provisioning, but it helps to configure your phone with necessary information to fetch from ldap
+**web** (optional) is used for external provisioning templates. You can delete it if you don't need provisioning, but it helps to configure your phone with necessary information to fetch from ldap
 
-**phpldapadmin** is used for checking and altering the ldap directory via a webeinterface. (NOTICE: Since the sync process is unidirectional i.e. from carddav to ldap, changes will be overwritten! 💥 )
+**phpldapadmin** (optional) is used for checking and altering the ldap directory via a webeinterface. (NOTICE: Since the sync process is unidirectional i.e. from carddav to ldap, changes will be overwritten! 💥 )
 
 ## ✅ Prerequisits
 ---
-Enter credentials and URLs in `.env`.
+Copy env_example to `.env` and enter data.
 
 Variable names should be self explanatory.
 
 Required variables are:
 
 ```
-LDAP_ORGANISATION
-LDAP_DOMAIN
+# LDAP
+# Required for ldap server
+LDAP_CONFIG_PASSWORD (for the user "cn=admin,cn=config")
+LDAP_ORGANISATION=example
+LDAP_DOMAIN=example.com
+
+# sync
 LDAP_BASE_DN ( LDAP base DN for contacts (e.g., "ou=contacts,dc=yourdomain,dc=local") )
 LDAP_USER ( LDAP bind username (e.g., "cn=admin,dc=yourdomain,dc=local") )
+LDAP_USER="cn=admin,dc=example,dc=com"
 LDAP_PASSWORD
-LDAP_SERVER
-CARDDAV_BASE_DISCOVERY_URL
-CARDDAV_USERNAME
-CARDDAV_PASSWORD
+CRON_SCHEDULE=*/5 * * * *
+
+# CARDDAV
+CARDDAV_USERNAME=
+CARDDAV_PASSWORD=
+CARDDAV_BASE_DISCOVERY_URL=https://calendar.example.com/dav.php/addressbooks/${CARDDAV_USERNAME}/
+
+# phpLDAPadmin Configuration
+LDAP_HOST=ldap (your ldap container name)
+HTTPS=false (not needed if running locally or behind a reverse proxy, refer to [osixia/phpldapadmin](https://github.com/osixia/docker-phpLDAPadmin) for details.)
+ADMIN_PORT=8081
+
 ```
 (if a variable is not set, defaults are used or an error is logged!)
 
@@ -55,8 +69,21 @@ LOG_FILE (defaults to /var/log/carddav2ldap/sync_output.log, can be set to a pat
 DEBUG (Turns on debug logging.)
 CENSOR_SECRETS_IN_LOGS (Defaults to true, set to false to spill out senistive secrets like LDAP_PASSWORD and CARDDAV_PASSWORD and sensitive ldap fields like telephoneNumber etc to stdout AND LOG_FILE (if enabled!))
 WARNING_TIMEOUT_SECONDS (Timeout in seconds for warning screen that is displayed, when CENSOR_SECRETS_IN_LOGS is set to false. Default is 30 seconds.)
+CARDDAV_IMPORT_PHOTOS
+CARDDAV_EMAIL_WHITELIST_DOMAINS
+CARDDAV_EMAIL_BLACKLIST_DOMAINS
+CARDDAV_CATEGORY_WHITELIST
+CARDDAV_CATEGORY_BLACKLIST
+CARDDAV_ADDRESSBOOK_WHITELIST
+CARDDAV_ADDRESSBOOK_BLACKLIST
 
 ```
+
+## 👷 Fill ldap with structure
+---
+Configure ldifs in the  
+`ldap_init_config/data`  
+directory depending on your needs
 
 ## 🏗️ Build and start Containers
 ---
@@ -65,165 +92,9 @@ docker compose build
 docker compose up -d
 ```
 
-## 👷 Fill ldap with structure
 ---
-At first the ldap directory is empty and only contains your base
-
-```
-docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
-```
-```
-SASL/EXTERNAL authentication started
-SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
-SASL SSF: 0
-No such object (32)
-Matched DN: dc=niwo,dc=home
-```
-
-### 🦧 First we create our admin user
-
-```
-cat admin.ldif
-# Set up admin user
-dn: cn=admin,dc=niwo,dc=home
-objectClass: inetOrgPerson
-cn: admin
-sn: admin
-userPassword:
-```
-
-Next we need to create two OUs
-
-```
-cat base.ldif
-# Create OU config
-dn: ou=config,dc=niwo,dc=home
-objectClass: organizationalUnit
-ou: contacts
-
-# Create OU contacts
-dn: ou=contacts,dc=niwo,dc=home
-objectClass: organizationalUnit
-ou: contacts
-
-```
-
-edit base.ldif to your needs and copy it to your "carddav2ldap_ldap_config" docker volume (usually `/var/lib/docker/volumes/carddav2ldap_ldap_config/_data`)
-
-and run
-
-```
-docker exec -it carddav2ldap-ldap-1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/admin.ldif
-docker exec -it carddav2ldap-ldap-1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/base.ldif
-```
-
-now you should have
-
-```
-docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -Y EXTERNAL -b "dc=niwo,dc=home" -LLL "(objectClass=*)"
-SASL/EXTERNAL authentication started
-SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
-SASL SSF: 0
-dn: dc=niwo,dc=home
-objectClass: top
-objectClass: dcObject
-objectClass: organization
-o: niwo
-dc: niwo
-
-dn: ou=config,dc=niwo,dc=home
-objectClass: organizationalUnit
-ou: contacts
-ou: config
-
-dn: ou=contacts,dc=niwo,dc=home
-objectClass: organizationalUnit
-ou: contacts
-```
-
-Additionally you can test if the login credentials are working
-
-```
-docker exec -it carddav2ldap-ldap-1 ldapsearch -H ldapi:/// -x -D "cn=admin,dc=niwo,dc=home" -w [LDAP_PASSWORD] -b "ou=contacts,dc=niwo,dc=home" -LLL "(objectClass=*)"
-```
-
-### 👶 Add user
----
-Next we add users to read your ldap directory
-
-```
-cat users.ldif
-# Set up Phone user
-dn: cn=phone,ou=contacts,dc=niwo,dc=home
-objectClass: inetOrgPerson
-cn: phone
-sn: phone
-userPassword:
-
-# Set up Printer user
-dn: cn=printer,ou=contacts,dc=niwo,dc=home
-objectClass: inetOrgPerson
-cn: printer
-sn: printer
-userPassword:
-```
 
 
-```
-cp users.ldif /var/lib/docker/volumes/carddav2ldap_ldap_config/_data
-```
-```
-docker exec -it carddav2ldap_ldap_1 ldapadd -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/users.ldif
-```
-```
-SASL/EXTERNAL authentication started
-SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
-SASL SSF: 0
-adding new entry "cn=phone,ou=contacts,dc=niwo,dc=home"
-
-adding new entry "cn=printer,ou=contacts,dc=niwo,dc=home"
-```
-
-With this you are already setup to read the ldap with your phone and printer:
-
-```
-root@host:# docker logs -f carddav2ldap_ldap_1
-...
-68540d8b conn=1011 fd=12 ACCEPT from IP=192.168.1.104:2097 (IP=0.0.0.0:389)
-68540d8b conn=1011 op=0 BIND dn="cn=phone,ou=contacts,dc=niwo,dc=home" method=128
-68540d8b conn=1011 op=0 BIND dn="cn=phone,ou=contacts,dc=niwo,dc=home" mech=SIMPLE ssf=0
-68540d8b conn=1011 op=0 RESULT tag=97 err=0 text=
-68540d8b conn=1011 op=1 SRCH base="dc=niwo.home" scope=2 deref=0 filter="(|(cn=*)(sn=*))"
-68540d8b conn=1011 op=1 SRCH attr=cn telephoneNumber
-68540d8b conn=1011 op=1 SEARCH RESULT tag=101 err=32 nentries=0 text=
-68540d8c conn=1011 op=2 SRCH base="dc=niwo.home" scope=2 deref=0 filter="(|(cn=*)(sn=*))"
-68540d8c conn=1011 op=2 SRCH attr=cn telephoneNumber
-68540d8c conn=1011 op=2 SEARCH RESULT tag=101 err=32 nentries=0 text=
-68540e05 conn=1011 op=3 UNBIND
-68540e05 conn=1011 fd=12 closed
-```
-
-Of course the phonebook should still be empty by now.
-
-
-#### ❤️‍🔥 Let users edit the directory (optional)
-If you want to have your users write to the directory, use the following acl.ldif
-```
-root@host:# cat acl.ldif
-dn: olcDatabase={1}mdb,cn=config
-changetype: modify
-replace: olcAccess
-olcAccess: to * by dn.base="cn=phone,ou=contacts,dc=niwo,dc=home" write by * read
-
-dn: olcDatabase={1}mdb,cn=config
-changetype: modify
-replace: olcAccess
-olcAccess: to * by dn.base="cn=printer,ou=contacts,dc=niwo,dc=home" write by * read
-```
-
-```
-docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/ldap/slapd.d/acl.ldif
-```
 
 # TODO
 - [X] throw out some default variables from Dockerfile and test missing/unset variables
@@ -240,17 +111,18 @@ docker exec -it carddav2ldap-ldap-1 ldapmodify -H ldapi:/// -Y EXTERNAL -f /etc/
 - [X] fix: invalidAttributeSyntax for mail and others
 - [X] feat: add and censor contact information in log files
 - [X] feat: saftey timeout to display warning message
-- [ ] fetch all phone and fax numbers
-- [ ] Blacklist for Adressbooks and/or contacts
+- [X] fetch all phone and fax numbers
+- [X] Blacklist for Adressbooks and/or contacts
 - [ ] test  UTF-8 encoding
 - [ ] test image handling
 - [X] fetch adress data and other fields like company etc
 - [ ] add check if script is already running and mitigate stacking
-- [ ] provide env_example
-- [ ] make cron string as a variable
+- [X] provide env_example
+- [X] make cron string as a variable
 - [ ] Add snom xml setup
 - [ ] shrink docker image
 - [ ] make setting up ldap structure automatic with variables
 - [ ] TZ
-- [ ] translate german comments to english
+- [X] translate german comments to english
 - [ ] reformat readme and describe variables more clearly as well as seperate variables for services
+- [ ] seperate email types
