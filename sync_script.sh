@@ -37,7 +37,8 @@ ACTIVE_FILE_LOG_PATH=""
 # 3. Otherwise (custom path), use the value of LOG_FILE.
 if [[ "${LOG_FILE,,}" == "false" || -z "${LOG_FILE}" ]]; then
     # File logging disabled (LOG_FILE not set or set to 'False'/'false').
-    echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')." | tee /dev/stdout
+    #echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')." | tee /dev/stdout
+    echo "$(date): File logging disabled (LOG_FILE not set or set to 'False'/'false')." 
     ACTIVE_FILE_LOG_PATH="/dev/null"
 elif [[ "${LOG_FILE,,}" == "true" ]]; then
     # LOG_FILE is explicitly set to true, use the default path.
